@@ -3,12 +3,21 @@ import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const departments = pgTable("departments", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
   role: text("role").notNull().default("employee"), // "employee" or "manager"
+  departmentId: integer("department_id").references(() => departments.id),
   dailyWorkHours: decimal("daily_work_hours", { precision: 4, scale: 2 }).notNull().default("8.00"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -51,11 +60,19 @@ export const hourBank = pgTable("hour_bank", {
 });
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const departmentsRelations = relations(departments, ({ many }) => ({
+  users: many(users),
+}));
+
+export const usersRelations = relations(users, ({ many, one }) => ({
   timeRecords: many(timeRecords),
   justifications: many(justifications),
   hourBank: many(hourBank),
   approvedJustifications: many(justifications, { relationName: "approver" }),
+  department: one(departments, {
+    fields: [users.departmentId],
+    references: [departments.id],
+  }),
 }));
 
 export const timeRecordsRelations = relations(timeRecords, ({ one }) => ({
@@ -85,6 +102,11 @@ export const hourBankRelations = relations(hourBank, ({ one }) => ({
 }));
 
 // Insert schemas
+export const insertDepartmentSchema = createInsertSchema(departments).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -111,6 +133,8 @@ export const insertHourBankSchema = createInsertSchema(hourBank).omit({
 });
 
 // Types
+export type Department = typeof departments.$inferSelect;
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type TimeRecord = typeof timeRecords.$inferSelect;

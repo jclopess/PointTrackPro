@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertTimeRecordSchema, insertJustificationSchema } from "@shared/schema";
+import { insertTimeRecordSchema, insertJustificationSchema, insertDepartmentSchema } from "@shared/schema";
 import { z } from "zod";
 
 export function registerRoutes(app: Express): Server {
@@ -23,6 +23,17 @@ export function registerRoutes(app: Express): Server {
     }
     next();
   };
+
+  // Departments endpoint
+  app.get("/api/departments", async (req, res) => {
+    try {
+      const departments = await storage.getAllDepartments();
+      res.json(departments);
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      res.status(500).send("Internal server error");
+    }
+  });
 
   // Time registration endpoint
   app.post("/api/time-records", requireAuth, async (req, res, next) => {
@@ -137,6 +148,29 @@ export function registerRoutes(app: Express): Server {
       const justifications = await storage.getJustificationsForUser(userId);
       res.json(justifications);
     } catch (error) {
+      next(error);
+    }
+  });
+
+  // Department endpoints
+  app.get("/api/departments", requireAuth, async (req, res, next) => {
+    try {
+      const departments = await storage.getAllDepartments();
+      res.json(departments);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/departments", requireManager, async (req, res, next) => {
+    try {
+      const validatedData = insertDepartmentSchema.parse(req.body);
+      const department = await storage.createDepartment(validatedData);
+      res.status(201).json(department);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
       next(error);
     }
   });

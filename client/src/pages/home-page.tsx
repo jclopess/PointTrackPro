@@ -23,6 +23,7 @@ export default function HomePage() {
 
   const { data: todayRecord, refetch: refetchToday } = useQuery({
     queryKey: ["/api/time-records/today"],
+    enabled: user?.role === "employee", // Only fetch for employees
   });
 
   const { data: timeRecords = [] } = useQuery({
@@ -30,10 +31,12 @@ export default function HomePage() {
     queryFn: () => 
       fetch(`/api/time-records?month=${selectedMonth}`, { credentials: "include" })
         .then(res => res.json()),
+    enabled: user?.role === "employee", // Only fetch for employees
   });
 
   const { data: justifications = [] } = useQuery({
     queryKey: ["/api/justifications"],
+    enabled: user?.role === "employee", // Only fetch for employees
   });
 
   const timeRegistrationMutation = useMutation({
@@ -162,121 +165,145 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          {/* Time Registration */}
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">Registros do Dia</h3>
-              
-              <TimeRegistrationGrid timeRecord={todayRecord} />
-
-              <div className="text-center mt-8">
-                <Button
-                  size="lg"
-                  onClick={() => timeRegistrationMutation.mutate()}
-                  disabled={!canRegister() || timeRegistrationMutation.isPending}
-                  className="px-8 py-4 text-lg"
-                >
-                  <Clock className="mr-3 h-5 w-5" />
-                  {canRegister() ? `Registrar ${getNextRegistrationType()}` : "Registros Completos"}
-                </Button>
-                {canRegister() && (
-                  <p className="text-sm text-gray-500 mt-2">
-                    Próximo registro disponível em: <span className="font-medium">{getNextAvailableTime()}</span>
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Historical Records */}
+          {/* Time Registration - Only for employees */}
+          {user?.role === "employee" && (
             <Card>
               <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Histórico de Registros</h3>
-                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-6">Registros do Dia</h3>
                 
-                <div className="space-y-3 mb-4">
-                  {timeRecords.slice(0, 5).map((record: any) => (
-                    <div key={record.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {new Date(record.date).toLocaleDateString('pt-BR')}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {record.totalHours ? `${record.totalHours}h trabalhadas` : "Registro incompleto"}
-                        </div>
-                      </div>
-                      <Badge variant={record.totalHours ? "default" : "secondary"}>
-                        {record.totalHours ? "Completo" : "Pendente"}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-                
-                <div>
-                  <label htmlFor="month-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                    Filtrar por mês:
-                  </label>
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getMonthOptions().map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+                <TimeRegistrationGrid timeRecord={todayRecord} />
 
-            {/* Justifications */}
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Justificativas</h3>
+                <div className="text-center mt-8">
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowJustificationModal(true)}
+                    size="lg"
+                    onClick={() => timeRegistrationMutation.mutate()}
+                    disabled={!canRegister() || timeRegistrationMutation.isPending}
+                    className="px-8 py-4 text-lg"
                   >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Nova
+                    <Clock className="mr-3 h-5 w-5" />
+                    {canRegister() ? `Registrar ${getNextRegistrationType()}` : "Registros Completos"}
                   </Button>
-                </div>
-                
-                <div className="space-y-3">
-                  {justifications.slice(0, 3).map((justification: any) => (
-                    <div key={justification.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-shrink-0">
-                        <Badge variant={justification.status === "pending" ? "secondary" : 
-                                      justification.status === "approved" ? "default" : "destructive"}>
-                          {justification.status === "pending" ? "Pendente" :
-                           justification.status === "approved" ? "Aprovado" : "Rejeitado"}
-                        </Badge>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">
-                          {new Date(justification.date).toLocaleDateString('pt-BR')}
-                        </p>
-                        <p className="text-sm text-gray-600">{justification.reason}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {justifications.length === 0 && (
-                    <p className="text-sm text-gray-500 text-center py-4">
-                      Nenhuma justificativa enviada
+                  {canRegister() && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Próximo registro disponível em: <span className="font-medium">{getNextAvailableTime()}</span>
                     </p>
                   )}
                 </div>
               </CardContent>
             </Card>
-          </div>
+          )}
+
+          {/* Quick Actions - Only for employees */}
+          {user?.role === "employee" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Historical Records */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Histórico de Registros</h3>
+                  </div>
+                  
+                  <div className="space-y-3 mb-4">
+                    {timeRecords.slice(0, 5).map((record: any) => (
+                      <div key={record.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {new Date(record.date).toLocaleDateString('pt-BR')}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {record.totalHours ? `${record.totalHours}h trabalhadas` : "Registro incompleto"}
+                          </div>
+                        </div>
+                        <Badge variant={record.totalHours ? "default" : "secondary"}>
+                          {record.totalHours ? "Completo" : "Pendente"}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="month-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                      Filtrar por mês:
+                    </label>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getMonthOptions().map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Justifications */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Justificativas</h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowJustificationModal(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Nova
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {justifications.slice(0, 3).map((justification: any) => (
+                      <div key={justification.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-shrink-0">
+                          <Badge variant={justification.status === "pending" ? "secondary" : 
+                                        justification.status === "approved" ? "default" : "destructive"}>
+                            {justification.status === "pending" ? "Pendente" :
+                             justification.status === "approved" ? "Aprovado" : "Rejeitado"}
+                          </Badge>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            {new Date(justification.date).toLocaleDateString('pt-BR')}
+                          </p>
+                          <p className="text-sm text-gray-600">{justification.reason}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {justifications.length === 0 && (
+                      <p className="text-sm text-gray-500 text-center py-4">
+                        Nenhuma justificativa enviada
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Manager Info */}
+          {user?.role === "manager" && (
+            <Card>
+              <CardContent className="p-6">
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Bem-vindo, Gestor!</h3>
+                  <p className="text-gray-600 mb-4">
+                    Como gestor, você tem acesso ao painel de gerenciamento da equipe.
+                  </p>
+                  <Link href="/manager">
+                    <Button className="px-6 py-3">
+                      <Users className="h-4 w-4 mr-2" />
+                      Acessar Painel de Gestão
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

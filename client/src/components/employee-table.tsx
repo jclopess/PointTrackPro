@@ -64,7 +64,7 @@ export function EmployeeTable({ employees, timeRecords }: EmployeeTableProps) {
                     <div>
                       <div className="text-sm font-medium text-gray-900">{employee.name}</div>
                       <div className="text-sm text-gray-500">
-                        {employee.role === "manager" ? "Gestor" : "Terceirizado"}
+                        {employee.department ? employee.department.name : "Sem departamento"}
                       </div>
                     </div>
                   </div>

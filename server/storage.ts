@@ -1,4 +1,4 @@
-import { users, timeRecords, justifications, hourBank, type User, type InsertUser, type TimeRecord, type InsertTimeRecord, type Justification, type InsertJustification, type HourBank, type InsertHourBank } from "@shared/schema";
+import { departments, users, timeRecords, justifications, hourBank, type Department, type InsertDepartment, type User, type InsertUser, type TimeRecord, type InsertTimeRecord, type Justification, type InsertJustification, type HourBank, type InsertHourBank } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import session from "express-session";
@@ -8,12 +8,18 @@ import { pool } from "./db";
 const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
+  // Department methods
+  getDepartment(id: number): Promise<Department | undefined>;
+  getAllDepartments(): Promise<Department[]>;
+  createDepartment(department: InsertDepartment): Promise<Department>;
+  updateDepartment(id: number, department: Partial<InsertDepartment>): Promise<Department | undefined>;
+
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
-  getAllEmployees(): Promise<User[]>;
+  getAllEmployees(): Promise<(User & { department: Department | null })[]>;
 
   // Time record methods
   getTimeRecord(userId: number, date: string): Promise<TimeRecord | undefined>;
@@ -33,17 +39,43 @@ export interface IStorage {
   createOrUpdateHourBank(hourBank: InsertHourBank): Promise<HourBank>;
   calculateHourBank(userId: number, month: string): Promise<HourBank>;
 
-  sessionStore: session.SessionStore;
+  sessionStore: any;
 }
 
 export class DatabaseStorage implements IStorage {
-  sessionStore: session.SessionStore;
+  sessionStore: any;
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({ 
       pool, 
       createTableIfMissing: true 
     });
+  }
+
+  async getDepartment(id: number): Promise<Department | undefined> {
+    const [department] = await db.select().from(departments).where(eq(departments.id, id));
+    return department || undefined;
+  }
+
+  async getAllDepartments(): Promise<Department[]> {
+    return await db.select().from(departments).where(eq(departments.isActive, true));
+  }
+
+  async createDepartment(insertDepartment: InsertDepartment): Promise<Department> {
+    const [department] = await db
+      .insert(departments)
+      .values(insertDepartment)
+      .returning();
+    return department;
+  }
+
+  async updateDepartment(id: number, updateDepartment: Partial<InsertDepartment>): Promise<Department | undefined> {
+    const [department] = await db
+      .update(departments)
+      .set(updateDepartment)
+      .where(eq(departments.id, id))
+      .returning();
+    return department || undefined;
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -73,8 +105,16 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async getAllEmployees(): Promise<User[]> {
-    return await db.select().from(users).where(eq(users.isActive, true));
+  async getAllEmployees(): Promise<(User & { department: Department | null })[]> {
+    return await db
+      .select()
+      .from(users)
+      .leftJoin(departments, eq(users.departmentId, departments.id))
+      .where(and(eq(users.isActive, true), eq(users.role, "employee")))
+      .then(results => results.map(result => ({
+        ...result.users,
+        department: result.departments
+      })));
   }
 
   async getTimeRecord(userId: number, date: string): Promise<TimeRecord | undefined> {
@@ -109,16 +149,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTimeRecordsForUser(userId: number, month?: string): Promise<TimeRecord[]> {
-    let query = db.select().from(timeRecords).where(eq(timeRecords.userId, userId));
+    let conditions = [eq(timeRecords.userId, userId)];
     
     if (month) {
-      query = query.where(and(
-        eq(timeRecords.userId, userId),
-        sql`substr(${timeRecords.date}, 1, 7) = ${month}`
-      ));
+      conditions.push(sql`substr(${timeRecords.date}, 1, 7) = ${month}`);
     }
     
-    return await query.orderBy(desc(timeRecords.date));
+    return await db
+      .select()
+      .from(timeRecords)
+      .where(and(...conditions))
+      .orderBy(desc(timeRecords.date));
   }
 
   async getAllTimeRecordsForDate(date: string): Promise<(TimeRecord & { user: User })[]> {

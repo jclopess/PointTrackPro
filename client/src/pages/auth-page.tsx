@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Clock, CheckCircle, Users, BarChart3 } from "lucide-react";
 import { Redirect } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -17,7 +18,13 @@ export default function AuthPage() {
     password: "",
     name: "",
     role: "employee",
+    departmentId: "",
     dailyWorkHours: "8.00"
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ["/api/departments"],
+    enabled: !user, // Only fetch when not logged in
   });
 
   // Redirect if already logged in
@@ -32,7 +39,10 @@ export default function AuthPage() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    registerMutation.mutate(registerForm);
+    registerMutation.mutate({
+      ...registerForm,
+      departmentId: registerForm.departmentId ? parseInt(registerForm.departmentId) : undefined,
+    });
   };
 
   return (
@@ -158,6 +168,26 @@ export default function AuthPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {registerForm.role === "employee" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="register-department">Departamento</Label>
+                        <Select
+                          value={registerForm.departmentId}
+                          onValueChange={(value) => setRegisterForm({ ...registerForm, departmentId: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um departamento" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {departments.map((dept: any) => (
+                              <SelectItem key={dept.id} value={dept.id.toString()}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label htmlFor="register-hours">Carga Horária Diária</Label>
                       <Select
