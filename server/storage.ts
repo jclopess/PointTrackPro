@@ -88,6 +88,11 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByCpf(cpf: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.cpf, cpf));
+    return user || undefined;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
@@ -110,7 +115,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .leftJoin(departments, eq(users.departmentId, departments.id))
-      .where(and(eq(users.isActive, true), eq(users.role, "employee")))
+      .where(and(eq(users.status, "active"), eq(users.role, "employee")))
       .then(results => results.map(result => ({
         ...result.users,
         department: result.departments

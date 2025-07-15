@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar, date } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -11,15 +11,50 @@ export const departments = pgTable("departments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Functions table
+export const functions = pgTable("functions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Employment types table
+export const employmentTypes = pgTable("employment_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  dailyWorkHours: decimal("daily_work_hours", { precision: 4, scale: 2 }).notNull().default("8.00"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Password reset requests table
+export const passwordResetRequests = pgTable("password_reset_requests", {
+  id: serial("id").primaryKey(),
+  cpf: text("cpf").notNull(),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  status: text("status").notNull().default("pending"), // "pending", "resolved"
+  resolvedBy: integer("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  cpf: text("cpf").notNull().unique(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
-  role: text("role").notNull().default("employee"), // "employee" or "manager"
+  phone: text("phone"),
+  role: text("role").notNull().default("employee"), // "employee", "manager", "admin"
   departmentId: integer("department_id").references(() => departments.id),
+  functionId: integer("function_id").references(() => functions.id),
+  employmentTypeId: integer("employment_type_id").references(() => employmentTypes.id),
+  admissionDate: date("admission_date"),
+  dismissalDate: date("dismissal_date"),
+  status: text("status").notNull().default("active"), // "active", "blocked", "inactive"
   dailyWorkHours: decimal("daily_work_hours", { precision: 4, scale: 2 }).notNull().default("8.00"),
-  isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -64,6 +99,24 @@ export const departmentsRelations = relations(departments, ({ many }) => ({
   users: many(users),
 }));
 
+// Functions relations
+export const functionsRelations = relations(functions, ({ many }) => ({
+  users: many(users),
+}));
+
+// Employment types relations
+export const employmentTypesRelations = relations(employmentTypes, ({ many }) => ({
+  users: many(users),
+}));
+
+// Password reset requests relations
+export const passwordResetRequestsRelations = relations(passwordResetRequests, ({ one }) => ({
+  resolvedBy: one(users, {
+    fields: [passwordResetRequests.resolvedBy],
+    references: [users.id],
+  }),
+}));
+
 export const usersRelations = relations(users, ({ many, one }) => ({
   timeRecords: many(timeRecords),
   justifications: many(justifications),
@@ -72,6 +125,14 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   department: one(departments, {
     fields: [users.departmentId],
     references: [departments.id],
+  }),
+  function: one(functions, {
+    fields: [users.functionId],
+    references: [functions.id],
+  }),
+  employmentType: one(employmentTypes, {
+    fields: [users.employmentTypeId],
+    references: [employmentTypes.id],
   }),
 }));
 
@@ -107,9 +168,30 @@ export const insertDepartmentSchema = createInsertSchema(departments).omit({
   createdAt: true,
 });
 
+export const insertFunctionSchema = createInsertSchema(functions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEmploymentTypeSchema = createInsertSchema(employmentTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPasswordResetRequestSchema = createInsertSchema(passwordResetRequests).omit({
+  id: true,
+  requestedAt: true,
+  status: true,
+  resolvedBy: true,
+  resolvedAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
+}).extend({
+  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, "CPF deve ter o formato 000.000.000-00"),
+  phone: z.string().regex(/^\(\d{2}\) 9\d{4}-\d{4}$/, "Telefone deve ter o formato (00) 90000-0000").optional(),
 });
 
 export const insertTimeRecordSchema = createInsertSchema(timeRecords).omit({
@@ -135,6 +217,16 @@ export const insertHourBankSchema = createInsertSchema(hourBank).omit({
 // Types
 export type Department = typeof departments.$inferSelect;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
+
+export type Function = typeof functions.$inferSelect;
+export type InsertFunction = z.infer<typeof insertFunctionSchema>;
+
+export type EmploymentType = typeof employmentTypes.$inferSelect;
+export type InsertEmploymentType = z.infer<typeof insertEmploymentTypeSchema>;
+
+export type PasswordResetRequest = typeof passwordResetRequests.$inferSelect;
+export type InsertPasswordResetRequest = z.infer<typeof insertPasswordResetRequestSchema>;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type TimeRecord = typeof timeRecords.$inferSelect;

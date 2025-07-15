@@ -43,7 +43,11 @@ export function setupAuth(app: Express) {
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
-      const user = await storage.getUserByUsername(username);
+      // Try to find user by username first, then by CPF
+      let user = await storage.getUserByUsername(username);
+      if (!user) {
+        user = await storage.getUserByCpf(username);
+      }
       if (!user || !(await comparePasswords(password, user.password))) {
         return done(null, false);
       } else {
@@ -58,21 +62,22 @@ export function setupAuth(app: Express) {
     done(null, user);
   });
 
-  app.post("/api/register", async (req, res, next) => {
-    const existingUser = await storage.getUserByUsername(req.body.username);
-    if (existingUser) {
-      return res.status(400).send("Username already exists");
+  app.post("/api/password-reset", async (req, res) => {
+    const { cpf } = req.body;
+    const user = await storage.getUserByCpf(cpf);
+    
+    if (!user) {
+      return res.status(404).send("Usuário não encontrado");
     }
 
-    const user = await storage.createUser({
-      ...req.body,
-      password: await hashPassword(req.body.password),
+    await storage.createPasswordResetRequest({
+      cpf: cpf,
+      userId: user.id,
+      status: "pending",
+      requestedAt: new Date(),
     });
 
-    req.login(user, (err) => {
-      if (err) return next(err);
-      res.status(201).json(user);
-    });
+    res.status(200).json({ message: "Solicitação de reset enviada para o gestor" });
   });
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
