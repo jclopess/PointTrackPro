@@ -2,7 +2,18 @@
 
 ## Overview
 
-This is a full-stack time tracking application built with React (frontend) and Express (backend). The system allows employees to register their work hours and managers to oversee employee time records, approve justifications, and generate reports. The application uses a PostgreSQL database via Neon with Drizzle ORM for data management.
+This is a comprehensive time tracking and HR management application for Brazilian organizations with three user roles: admin (full system access), manager (employee oversight and user management), and employee (time tracking only). The system features sequential 4-times daily registration, department-based organization, comprehensive user management with CPF-based authentication, and employment type management with varying work hours. The application uses a PostgreSQL database via Neon with Drizzle ORM for data management.
+
+## Recent Changes (July 15, 2025)
+
+✓ Expanded database schema to include functions, employment types, and password reset requests tables
+✓ Implemented admin user role with full system access and user management capabilities  
+✓ Added comprehensive user registration form with CPF (000.000.000-00), phone (00) 90000-0000, employment details, and status management
+✓ Created admin dashboard for managing users, departments, functions, and employment types
+✓ Replaced public user registration with password recovery functionality on auth page
+✓ Updated authentication system to use CPF as login credential instead of username
+✓ Fixed React hooks error in authentication flow
+✓ Added proper role-based access control with admin/manager/employee permissions
 
 ## User Preferences
 

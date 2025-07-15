@@ -19,22 +19,6 @@ export default function AuthPage() {
   const [resetForm, setResetForm] = useState({ cpf: "" });
   const [showPasswordReset, setShowPasswordReset] = useState(false);
 
-  // Redirect if already logged in
-  if (user) {
-    if (user.role === "admin") {
-      return <Redirect to="/admin" />;
-    } else if (user.role === "manager") {
-      return <Redirect to="/manager" />;
-    } else {
-      return <Redirect to="/" />;
-    }
-  }
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    loginMutation.mutate(loginForm);
-  };
-
   const passwordResetMutation = useMutation({
     mutationFn: (cpf: string) => apiRequest("POST", "/api/password-reset", { cpf }),
     onSuccess: () => {
@@ -50,10 +34,26 @@ export default function AuthPage() {
     },
   });
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    loginMutation.mutate(loginForm);
+  };
+
   const handlePasswordReset = (e: React.FormEvent) => {
     e.preventDefault();
     passwordResetMutation.mutate(resetForm.cpf);
   };
+
+  // Redirect if already logged in - after all hooks
+  if (user) {
+    if (user.role === "admin") {
+      return <Redirect to="/admin" />;
+    } else if (user.role === "manager") {
+      return <Redirect to="/manager" />;
+    } else {
+      return <Redirect to="/" />;
+    }
+  }
 
   return (
     <div className="min-h-screen flex">
