@@ -57,6 +57,42 @@ export default function AdminDashboard() {
     },
   });
 
+  const createDepartmentMutation = useMutation({
+    mutationFn: (deptData: any) => apiRequest("POST", "/api/admin/departments", deptData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
+      setShowDepartmentModal(false);
+      toast({ title: "Departamento criado com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createFunctionMutation = useMutation({
+    mutationFn: (funcData: any) => apiRequest("POST", "/api/admin/functions", funcData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/functions"] });
+      setShowFunctionModal(false);
+      toast({ title: "Função criada com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createEmploymentTypeMutation = useMutation({
+    mutationFn: (typeData: any) => apiRequest("POST", "/api/admin/employment-types", typeData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/employment-types"] });
+      setShowEmploymentTypeModal(false);
+      toast({ title: "Vínculo criado com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updateUserMutation = useMutation({
     mutationFn: ({ id, ...userData }: any) => apiRequest("PUT", `/api/admin/users/${id}`, userData),
     onSuccess: () => {
@@ -111,6 +147,106 @@ export default function AdminDashboard() {
             <TabsTrigger value="employment-types">Vínculos</TabsTrigger>
             <TabsTrigger value="password-resets">Reset de Senhas</TabsTrigger>
           </TabsList>
+
+          {/* Departments Tab */}
+          <TabsContent value="departments">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="flex items-center gap-2">
+                    <Building className="h-5 w-5" />
+                    Gerenciamento de Departamentos
+                  </CardTitle>
+                  <Button onClick={() => setShowDepartmentModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Departamento
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {departments.map((dept: any) => (
+                    <div key={dept.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h3 className="font-medium">{dept.name}</h3>
+                        <p className="text-sm text-gray-500">{dept.description}</p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Functions Tab */}
+          <TabsContent value="functions">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="flex items-center gap-2">
+                    <Briefcase className="h-5 w-5" />
+                    Gerenciamento de Funções
+                  </CardTitle>
+                  <Button onClick={() => setShowFunctionModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Função
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {functions.map((func: any) => (
+                    <div key={func.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h3 className="font-medium">{func.name}</h3>
+                        <p className="text-sm text-gray-500">{func.description}</p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Employment Types Tab */}
+          <TabsContent value="employment-types">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Gerenciamento de Vínculos
+                  </CardTitle>
+                  <Button onClick={() => setShowEmploymentTypeModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Vínculo
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {employmentTypes.map((type: any) => (
+                    <div key={type.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h3 className="font-medium">{type.name}</h3>
+                        <p className="text-sm text-gray-500">{type.description}</p>
+                        <p className="text-sm text-blue-600">{type.dailyWorkHours}h por dia</p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Users Tab */}
           <TabsContent value="users">
@@ -324,6 +460,127 @@ export default function AdminDashboard() {
               {editingItem ? "Atualizar" : "Criar"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Department Modal */}
+      <Dialog open={showDepartmentModal} onOpenChange={setShowDepartmentModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Departamento</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target as HTMLFormElement);
+            createDepartmentMutation.mutate({
+              name: formData.get('name'),
+              description: formData.get('description'),
+            });
+          }}>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="dept-name">Nome</Label>
+                <Input id="dept-name" name="name" required />
+              </div>
+              <div>
+                <Label htmlFor="dept-desc">Descrição</Label>
+                <Input id="dept-desc" name="description" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <Button type="button" variant="outline" onClick={() => setShowDepartmentModal(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createDepartmentMutation.isPending}>
+                {createDepartmentMutation.isPending ? "Criando..." : "Criar"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Function Modal */}
+      <Dialog open={showFunctionModal} onOpenChange={setShowFunctionModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Função</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target as HTMLFormElement);
+            createFunctionMutation.mutate({
+              name: formData.get('name'),
+              description: formData.get('description'),
+            });
+          }}>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="func-name">Nome</Label>
+                <Input id="func-name" name="name" required />
+              </div>
+              <div>
+                <Label htmlFor="func-desc">Descrição</Label>
+                <Input id="func-desc" name="description" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <Button type="button" variant="outline" onClick={() => setShowFunctionModal(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createFunctionMutation.isPending}>
+                {createFunctionMutation.isPending ? "Criando..." : "Criar"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Employment Type Modal */}
+      <Dialog open={showEmploymentTypeModal} onOpenChange={setShowEmploymentTypeModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Vínculo</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target as HTMLFormElement);
+            createEmploymentTypeMutation.mutate({
+              name: formData.get('name'),
+              description: formData.get('description'),
+              dailyWorkHours: parseFloat(formData.get('dailyWorkHours') as string),
+            });
+          }}>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="type-name">Nome</Label>
+                <Input id="type-name" name="name" required />
+              </div>
+              <div>
+                <Label htmlFor="type-desc">Descrição</Label>
+                <Input id="type-desc" name="description" />
+              </div>
+              <div>
+                <Label htmlFor="type-hours">Horas Diárias</Label>
+                <Input 
+                  id="type-hours" 
+                  name="dailyWorkHours" 
+                  type="number" 
+                  step="0.5" 
+                  min="1" 
+                  max="12" 
+                  required 
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <Button type="button" variant="outline" onClick={() => setShowEmploymentTypeModal(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createEmploymentTypeMutation.isPending}>
+                {createEmploymentTypeMutation.isPending ? "Criando..." : "Criar"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

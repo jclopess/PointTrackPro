@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertTimeRecordSchema, insertJustificationSchema, insertDepartmentSchema } from "@shared/schema";
+import { insertTimeRecordSchema, insertJustificationSchema, insertDepartmentSchema, insertUserSchema, insertFunctionSchema, insertEmploymentTypeSchema } from "@shared/schema";
 import { z } from "zod";
 
 export function registerRoutes(app: Express): Server {
@@ -260,6 +260,107 @@ export function registerRoutes(app: Express): Server {
       res.json(hourBank);
     } catch (error) {
       next(error);
+    }
+  });
+
+  // Admin routes
+  app.get("/api/admin/users", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== "admin") {
+      return res.sendStatus(401);
+    }
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/functions", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== "admin") {
+      return res.sendStatus(401);
+    }
+    try {
+      const functions = await storage.getAllFunctions();
+      res.json(functions);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/employment-types", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== "admin") {
+      return res.sendStatus(401);
+    }
+    try {
+      const types = await storage.getAllEmploymentTypes();
+      res.json(types);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/password-reset-requests", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== "admin") {
+      return res.sendStatus(401);
+    }
+    try {
+      const requests = await storage.getPendingPasswordResetRequests();
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/users", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== "admin") {
+      return res.sendStatus(401);
+    }
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      const user = await storage.createUser(userData);
+      res.status(201).json(user);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/departments", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== "admin") {
+      return res.sendStatus(401);
+    }
+    try {
+      const departmentData = insertDepartmentSchema.parse(req.body);
+      const department = await storage.createDepartment(departmentData);
+      res.status(201).json(department);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/functions", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== "admin") {
+      return res.sendStatus(401);
+    }
+    try {
+      const functionData = insertFunctionSchema.parse(req.body);
+      const func = await storage.createFunction(functionData);
+      res.status(201).json(func);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/employment-types", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== "admin") {
+      return res.sendStatus(401);
+    }
+    try {
+      const typeData = insertEmploymentTypeSchema.parse(req.body);
+      const type = await storage.createEmploymentType(typeData);
+      res.status(201).json(type);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
     }
   });
 

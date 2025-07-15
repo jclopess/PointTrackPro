@@ -1,4 +1,4 @@
-import { departments, users, timeRecords, justifications, hourBank, type Department, type InsertDepartment, type User, type InsertUser, type TimeRecord, type InsertTimeRecord, type Justification, type InsertJustification, type HourBank, type InsertHourBank } from "@shared/schema";
+import { departments, users, timeRecords, justifications, hourBank, functions, employmentTypes, passwordResetRequests, type Department, type InsertDepartment, type User, type InsertUser, type TimeRecord, type InsertTimeRecord, type Justification, type InsertJustification, type HourBank, type InsertHourBank, type Function, type InsertFunction, type EmploymentType, type InsertEmploymentType, type PasswordResetRequest, type InsertPasswordResetRequest } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import session from "express-session";
@@ -17,9 +17,11 @@ export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByCpf(cpf: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
   getAllEmployees(): Promise<(User & { department: Department | null })[]>;
+  getAllUsers(): Promise<(User & { department: Department | null; function: Function | null; employmentType: EmploymentType | null })[]>;
 
   // Time record methods
   getTimeRecord(userId: number, date: string): Promise<TimeRecord | undefined>;
@@ -120,6 +122,22 @@ export class DatabaseStorage implements IStorage {
         ...result.users,
         department: result.departments
       })));
+  }
+
+  async getAllUsers(): Promise<(User & { department: Department | null; function: Function | null; employmentType: EmploymentType | null })[]> {
+    const results = await db
+      .select()
+      .from(users)
+      .leftJoin(departments, eq(users.departmentId, departments.id))
+      .leftJoin(functions, eq(users.functionId, functions.id))
+      .leftJoin(employmentTypes, eq(users.employmentTypeId, employmentTypes.id));
+    
+    return results.map(result => ({
+      ...result.users,
+      department: result.departments,
+      function: result.functions,
+      employmentType: result.employment_types
+    }));
   }
 
   async getTimeRecord(userId: number, date: string): Promise<TimeRecord | undefined> {
@@ -298,6 +316,89 @@ export class DatabaseStorage implements IStorage {
     }
 
     return workingDays;
+  }
+
+  // Function methods
+  async getFunction(id: number): Promise<Function | undefined> {
+    const [func] = await db.select().from(functions).where(eq(functions.id, id));
+    return func || undefined;
+  }
+
+  async getAllFunctions(): Promise<Function[]> {
+    return await db.select().from(functions);
+  }
+
+  async createFunction(insertFunction: InsertFunction): Promise<Function> {
+    const [func] = await db
+      .insert(functions)
+      .values(insertFunction)
+      .returning();
+    return func;
+  }
+
+  async updateFunction(id: number, updateFunction: Partial<InsertFunction>): Promise<Function | undefined> {
+    const [func] = await db
+      .update(functions)
+      .set(updateFunction)
+      .where(eq(functions.id, id))
+      .returning();
+    return func || undefined;
+  }
+
+  // Employment type methods
+  async getEmploymentType(id: number): Promise<EmploymentType | undefined> {
+    const [type] = await db.select().from(employmentTypes).where(eq(employmentTypes.id, id));
+    return type || undefined;
+  }
+
+  async getAllEmploymentTypes(): Promise<EmploymentType[]> {
+    return await db.select().from(employmentTypes);
+  }
+
+  async createEmploymentType(insertEmploymentType: InsertEmploymentType): Promise<EmploymentType> {
+    const [type] = await db
+      .insert(employmentTypes)
+      .values(insertEmploymentType)
+      .returning();
+    return type;
+  }
+
+  async updateEmploymentType(id: number, updateEmploymentType: Partial<InsertEmploymentType>): Promise<EmploymentType | undefined> {
+    const [type] = await db
+      .update(employmentTypes)
+      .set(updateEmploymentType)
+      .where(eq(employmentTypes.id, id))
+      .returning();
+    return type || undefined;
+  }
+
+  // Password reset methods
+  async createPasswordResetRequest(insertRequest: InsertPasswordResetRequest): Promise<PasswordResetRequest> {
+    const [request] = await db
+      .insert(passwordResetRequests)
+      .values(insertRequest)
+      .returning();
+    return request;
+  }
+
+  async getPendingPasswordResetRequests(): Promise<PasswordResetRequest[]> {
+    return await db
+      .select()
+      .from(passwordResetRequests)
+      .where(eq(passwordResetRequests.status, "pending"));
+  }
+
+  async resolvePasswordResetRequest(id: number, resolverId: number): Promise<PasswordResetRequest | undefined> {
+    const [request] = await db
+      .update(passwordResetRequests)
+      .set({ 
+        status: "resolved",
+        resolvedBy: resolverId,
+        resolvedAt: new Date()
+      })
+      .where(eq(passwordResetRequests.id, id))
+      .returning();
+    return request || undefined;
   }
 }
 
