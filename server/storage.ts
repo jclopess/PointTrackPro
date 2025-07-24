@@ -13,7 +13,20 @@ export interface IStorage {
   getAllDepartments(): Promise<Department[]>;
   createDepartment(department: InsertDepartment): Promise<Department>;
   updateDepartment(id: number, department: Partial<InsertDepartment>): Promise<Department | undefined>;
+  deleteDepartment(id: number): Promise<void>;
 
+  // Function methods
+  getAllFunctions(): Promise<Function[]>;
+  createFunction(func: InsertFunction): Promise<Function>;
+  updateFunction(id: number, func: Partial<InsertFunction>): Promise<Function | undefined>;
+  deleteFunction(id: number): Promise<void>;
+
+  // Employment Type methods
+  getAllEmploymentTypes(): Promise<EmploymentType[]>;
+  createEmploymentType(type: InsertEmploymentType): Promise<EmploymentType>;
+  updateEmploymentType(id: number, type: Partial<InsertEmploymentType>): Promise<EmploymentType | undefined>;
+  deleteEmploymentType(id: number): Promise<void>;
+  
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -54,6 +67,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  // Department Methods
   async getDepartment(id: number): Promise<Department | undefined> {
     const [department] = await db.select().from(departments).where(eq(departments.id, id));
     return department || undefined;
@@ -79,7 +93,65 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return department || undefined;
   }
+  
+  async deleteDepartment(id: number): Promise<void> {
+    // Soft delete by setting isActive to false
+    await db.update(departments).set({ isActive: false }).where(eq(departments.id, id));
+  }
 
+  // Function methods
+  async getAllFunctions(): Promise<Function[]> {
+    return await db.select().from(functions).where(eq(functions.isActive, true));
+  }
+
+  async createFunction(insertFunction: InsertFunction): Promise<Function> {
+    const [func] = await db
+      .insert(functions)
+      .values(insertFunction)
+      .returning();
+    return func;
+  }
+
+  async updateFunction(id: number, updateFunction: Partial<InsertFunction>): Promise<Function | undefined> {
+    const [func] = await db
+      .update(functions)
+      .set(updateFunction)
+      .where(eq(functions.id, id))
+      .returning();
+    return func || undefined;
+  }
+
+  async deleteFunction(id: number): Promise<void> {
+    await db.update(functions).set({ isActive: false }).where(eq(functions.id, id));
+  }
+
+  // Employment type methods
+  async getAllEmploymentTypes(): Promise<EmploymentType[]> {
+    return await db.select().from(employmentTypes).where(eq(employmentTypes.isActive, true));
+  }
+
+  async createEmploymentType(insertEmploymentType: InsertEmploymentType): Promise<EmploymentType> {
+    const [type] = await db
+      .insert(employmentTypes)
+      .values(insertEmploymentType)
+      .returning();
+    return type;
+  }
+
+  async updateEmploymentType(id: number, updateEmploymentType: Partial<InsertEmploymentType>): Promise<EmploymentType | undefined> {
+    const [type] = await db
+      .update(employmentTypes)
+      .set(updateEmploymentType)
+      .where(eq(employmentTypes.id, id))
+      .returning();
+    return type || undefined;
+  }
+
+  async deleteEmploymentType(id: number): Promise<void> {
+    await db.update(employmentTypes).set({ isActive: false }).where(eq(employmentTypes.id, id));
+  }
+
+  // User Methods (rest of the file remains the same...)
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
@@ -317,58 +389,14 @@ export class DatabaseStorage implements IStorage {
 
     return workingDays;
   }
-
-  // Function methods
+  
   async getFunction(id: number): Promise<Function | undefined> {
     const [func] = await db.select().from(functions).where(eq(functions.id, id));
     return func || undefined;
   }
 
-  async getAllFunctions(): Promise<Function[]> {
-    return await db.select().from(functions);
-  }
-
-  async createFunction(insertFunction: InsertFunction): Promise<Function> {
-    const [func] = await db
-      .insert(functions)
-      .values(insertFunction)
-      .returning();
-    return func;
-  }
-
-  async updateFunction(id: number, updateFunction: Partial<InsertFunction>): Promise<Function | undefined> {
-    const [func] = await db
-      .update(functions)
-      .set(updateFunction)
-      .where(eq(functions.id, id))
-      .returning();
-    return func || undefined;
-  }
-
-  // Employment type methods
   async getEmploymentType(id: number): Promise<EmploymentType | undefined> {
     const [type] = await db.select().from(employmentTypes).where(eq(employmentTypes.id, id));
-    return type || undefined;
-  }
-
-  async getAllEmploymentTypes(): Promise<EmploymentType[]> {
-    return await db.select().from(employmentTypes);
-  }
-
-  async createEmploymentType(insertEmploymentType: InsertEmploymentType): Promise<EmploymentType> {
-    const [type] = await db
-      .insert(employmentTypes)
-      .values(insertEmploymentType)
-      .returning();
-    return type;
-  }
-
-  async updateEmploymentType(id: number, updateEmploymentType: Partial<InsertEmploymentType>): Promise<EmploymentType | undefined> {
-    const [type] = await db
-      .update(employmentTypes)
-      .set(updateEmploymentType)
-      .where(eq(employmentTypes.id, id))
-      .returning();
     return type || undefined;
   }
 
