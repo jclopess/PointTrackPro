@@ -30,7 +30,7 @@ export default function AdminDashboard() {
 
   // Queries
   const { data: users = [] } = useQuery({ queryKey: ["/api/admin/users"] });
-  const { data: departments = [] } = useQuery({ queryKey: ["/api/departments"] });
+  const { data: departments = [] } = useQuery({ queryKey: ["/api/admin/departments"] });
   const { data: functions = [] } = useQuery({ queryKey: ["/api/admin/functions"] });
   const { data: employmentTypes = [] } = useQuery({ queryKey: ["/api/admin/employment-types"] });
   const { data: passwordResetRequests = [] } = useQuery({ queryKey: ["/api/admin/password-reset-requests"] });
@@ -53,6 +53,19 @@ export default function AdminDashboard() {
     },
   });
 
+  const updateUserMutation = useMutation({
+    mutationFn: ({ id, ...userData }: any) => apiRequest("PUT", `/api/admin/users/${id}`, userData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setShowUserModal(false);
+      setEditingItem(null);
+      toast({ title: "Usuário atualizado com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar usuário", description: error.message, variant: "destructive" });
+    },
+  });
+
   const resetPasswordMutation = useMutation({
     mutationFn: ({ id, password }: { id: number; password: string }) => 
       apiRequest("POST", `/api/admin/users/${id}/reset-password`, { password }),
@@ -67,7 +80,7 @@ export default function AdminDashboard() {
   const createDepartmentMutation = useMutation({
     mutationFn: (deptData: any) => apiRequest("POST", "/api/admin/departments", deptData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/departments"] });
       setShowDepartmentModal(false);
       setEditingItem(null);
       toast({ title: "Departamento criado com sucesso" });
@@ -80,7 +93,7 @@ export default function AdminDashboard() {
   const updateDepartmentMutation = useMutation({
     mutationFn: ({ id, ...deptData }: any) => apiRequest("PUT", `/api/admin/departments/${id}`, deptData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/departments"] });
       setShowDepartmentModal(false);
       setEditingItem(null);
       toast({ title: "Departamento atualizado com sucesso" });
@@ -93,7 +106,7 @@ export default function AdminDashboard() {
   const deleteDepartmentMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/departments/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/departments"] });
       setItemToDelete(null);
       toast({ title: "Departamento desativado com sucesso" });
     },
@@ -198,7 +211,7 @@ export default function AdminDashboard() {
     };
     
     if (editingItem) {
-      // updateUserMutation.mutate({ id: editingItem.id, ...data });
+      updateUserMutation.mutate({ id: editingItem.id, ...data });
     } else {
       createUserMutation.mutate(data);
     }
@@ -415,13 +428,18 @@ export default function AdminDashboard() {
                         <h3 className="font-medium">{dept.name}</h3>
                         <p className="text-sm text-gray-500">{dept.description}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenDepartmentModal(dept)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => setItemToDelete({ type: 'department', data: dept })}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center gap-4">
+                        <Badge variant={dept.isActive ? "default" : "secondary"}>
+                          {dept.isActive ? "Ativo" : "Inativo"}
+                        </Badge>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleOpenDepartmentModal(dept)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => setItemToDelete({ type: 'department', data: dept })}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -453,13 +471,18 @@ export default function AdminDashboard() {
                         <h3 className="font-medium">{func.name}</h3>
                         <p className="text-sm text-gray-500">{func.description}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenFunctionModal(func)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => setItemToDelete({ type: 'function', data: func })}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center gap-4">
+                        <Badge variant={func.isActive ? "default" : "secondary"}>
+                          {func.isActive ? "Ativo" : "Inativo"}
+                        </Badge>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleOpenFunctionModal(func)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => setItemToDelete({ type: 'function', data: func })}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -492,13 +515,18 @@ export default function AdminDashboard() {
                         <p className="text-sm text-gray-500">{type.description}</p>
                         <p className="text-sm text-blue-600">{type.dailyWorkHours}h por dia</p>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenEmploymentTypeModal(type)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => setItemToDelete({ type: 'employmentType', data: type })}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center gap-4">
+                        <Badge variant={type.isActive ? "default" : "secondary"}>
+                          {type.isActive ? "Ativo" : "Inativo"}
+                        </Badge>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleOpenEmploymentTypeModal(type)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => setItemToDelete({ type: 'employmentType', data: type })}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -643,7 +671,7 @@ export default function AdminDashboard() {
               <Button type="button" variant="outline" onClick={() => setShowUserModal(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createUserMutation.isPending}>
+              <Button type="submit" disabled={createUserMutation.isPending || updateUserMutation.isPending}>
                 {editingItem ? "Atualizar" : "Criar"}
               </Button>
             </div>

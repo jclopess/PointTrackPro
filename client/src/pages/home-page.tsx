@@ -43,7 +43,7 @@ export default function HomePage() {
     mutationFn: () => apiRequest("POST", "/api/time-records"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-records"] });
-      refetchToday();
+      queryClient.invalidateQueries({ queryKey: ["/api/time-records/today"] });
       toast({
         title: "Registro realizado",
         description: "Horário registrado com sucesso.",

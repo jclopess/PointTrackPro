@@ -29,6 +29,143 @@ export function registerRoutes(app: Express): Server {
     next();
   };
 
+  // Admin routes for users
+  app.get("/api/admin/users", requireAdmin, async (req, res, next) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const { password, ...userData } = req.body;
+      if (password) {
+        userData.password = await hashPassword(password);
+      }
+      const updatedUser = await storage.updateUser(Number(req.params.id), userData);
+      res.json(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+
+  // Admin routes for departments
+  app.get("/api/admin/departments", requireAdmin, async (req, res, next) => {
+    try {
+      const departments = await storage.getAllDepartmentsForAdmin();
+      res.json(departments);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/admin/departments", requireAdmin, async (req, res, next) => {
+    try {
+      const newDepartment = await storage.createDepartment(req.body);
+      res.status(201).json(newDepartment);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/admin/departments/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const updatedDepartment = await storage.updateDepartment(Number(req.params.id), req.body);
+      res.json(updatedDepartment);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/admin/departments/:id", requireAdmin, async (req, res, next) => {
+    try {
+      await storage.deleteDepartment(Number(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+
+  // Admin routes for functions
+  app.get("/api/admin/functions", requireAdmin, async (req, res, next) => {
+    try {
+      const functions = await storage.getAllFunctionsForAdmin();
+      res.json(functions);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/admin/functions", requireAdmin, async (req, res, next) => {
+    try {
+      const newFunction = await storage.createFunction(req.body);
+      res.status(201).json(newFunction);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.put("/api/admin/functions/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const updatedFunction = await storage.updateFunction(Number(req.params.id), req.body);
+      res.json(updatedFunction);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/admin/functions/:id", requireAdmin, async (req, res, next) => {
+    try {
+      await storage.deleteFunction(Number(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin routes for employment types
+  app.get("/api/admin/employment-types", requireAdmin, async (req, res, next) => {
+    try {
+      const types = await storage.getAllEmploymentTypesForAdmin();
+      res.json(types);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/admin/employment-types", requireAdmin, async (req, res, next) => {
+    try {
+      const newType = await storage.createEmploymentType(req.body);
+      res.status(201).json(newType);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/admin/employment-types/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const updatedType = await storage.updateEmploymentType(Number(req.params.id), req.body);
+      res.json(updatedType);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/admin/employment-types/:id", requireAdmin, async (req, res, next) => {
+    try {
+      await storage.deleteEmploymentType(Number(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+
   // ... (outras rotas permanecem iguais)
   app.get("/api/departments", async (req, res) => {
     try {
@@ -37,6 +174,17 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error fetching departments:", error);
       res.status(500).send("Internal server error");
+    }
+  });
+
+  app.get("/api/time-records/today", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const today = new Date().toISOString().split('T')[0];
+      const record = await storage.getTimeRecord(userId, today);
+      res.json(record || null);
+    } catch (error) {
+      next(error);
     }
   });
 

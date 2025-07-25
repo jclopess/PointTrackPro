@@ -11,18 +11,21 @@ export interface IStorage {
   // Department methods
   getDepartment(id: number): Promise<Department | undefined>;
   getAllDepartments(): Promise<Department[]>;
+  getAllDepartmentsForAdmin(): Promise<Department[]>;
   createDepartment(department: InsertDepartment): Promise<Department>;
   updateDepartment(id: number, department: Partial<InsertDepartment>): Promise<Department | undefined>;
   deleteDepartment(id: number): Promise<void>;
 
   // Function methods
   getAllFunctions(): Promise<Function[]>;
+  getAllFunctionsForAdmin(): Promise<Function[]>;
   createFunction(func: InsertFunction): Promise<Function>;
   updateFunction(id: number, func: Partial<InsertFunction>): Promise<Function | undefined>;
   deleteFunction(id: number): Promise<void>;
 
   // Employment Type methods
   getAllEmploymentTypes(): Promise<EmploymentType[]>;
+  getAllEmploymentTypesForAdmin(): Promise<EmploymentType[]>;
   createEmploymentType(type: InsertEmploymentType): Promise<EmploymentType>;
   updateEmploymentType(id: number, type: Partial<InsertEmploymentType>): Promise<EmploymentType | undefined>;
   deleteEmploymentType(id: number): Promise<void>;
@@ -77,6 +80,10 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(departments).where(eq(departments.isActive, true));
   }
 
+  async getAllDepartmentsForAdmin(): Promise<Department[]> {
+    return await db.select().from(departments);
+  }
+
   async createDepartment(insertDepartment: InsertDepartment): Promise<Department> {
     const [department] = await db
       .insert(departments)
@@ -104,6 +111,10 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(functions).where(eq(functions.isActive, true));
   }
 
+  async getAllFunctionsForAdmin(): Promise<Function[]> {
+    return await db.select().from(functions);
+  }
+
   async createFunction(insertFunction: InsertFunction): Promise<Function> {
     const [func] = await db
       .insert(functions)
@@ -128,6 +139,10 @@ export class DatabaseStorage implements IStorage {
   // Employment type methods
   async getAllEmploymentTypes(): Promise<EmploymentType[]> {
     return await db.select().from(employmentTypes).where(eq(employmentTypes.isActive, true));
+  }
+  
+  async getAllEmploymentTypesForAdmin(): Promise<EmploymentType[]> {
+    return await db.select().from(employmentTypes);
   }
 
   async createEmploymentType(insertEmploymentType: InsertEmploymentType): Promise<EmploymentType> {

@@ -191,7 +191,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
 }).extend({
   cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, "CPF deve ter o formato 000.000.000-00"),
-  phone: z.string().regex(/^\(\d{2}\) 9\d{4}-\d{4}$/, "Telefone deve ter o formato (00) 90000-0000").optional(),
+  phone: z.string().optional(),
 });
 
 export const insertTimeRecordSchema = createInsertSchema(timeRecords).omit({
