@@ -33,6 +33,7 @@ export const employmentTypes = pgTable("employment_types", {
 // Password reset requests table
 export const passwordResetRequests = pgTable("password_reset_requests", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
   cpf: text("cpf").notNull(),
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   status: text("status").notNull().default("pending"), // "pending", "resolved"

@@ -57,6 +57,12 @@ export interface IStorage {
   createOrUpdateHourBank(hourBank: InsertHourBank): Promise<HourBank>;
   calculateHourBank(userId: number, month: string): Promise<HourBank>;
 
+  // Password reset methods
+  getPasswordResetRequest(id: number): Promise<PasswordResetRequest | undefined>;
+  createPasswordResetRequest(request: InsertPasswordResetRequest): Promise<PasswordResetRequest>;
+  getPendingPasswordResetRequests(): Promise<PasswordResetRequest[]>;
+  resolvePasswordResetRequest(id: number, resolverId: number): Promise<PasswordResetRequest | undefined>;
+
   sessionStore: any;
 }
 
@@ -76,7 +82,10 @@ export class DatabaseStorage implements IStorage {
     return department || undefined;
   }
 
-  async getAllDepartments(): Promise<Department[]> {
+  async getAllDepartments(showInactive: boolean = false): Promise<Department[]> {
+    if (showInactive) {
+      return await db.select().from(departments);
+    }
     return await db.select().from(departments).where(eq(departments.isActive, true));
   }
 
@@ -84,30 +93,26 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(departments);
   }
 
-  async createDepartment(insertDepartment: InsertDepartment): Promise<Department> {
-    const [department] = await db
-      .insert(departments)
-      .values(insertDepartment)
-      .returning();
-    return department;
+  async createDepartment(data: InsertDepartment): Promise<Department> {
+    const [newItem] = await db.insert(departments).values(data).returning();
+    return newItem;
   }
 
-  async updateDepartment(id: number, updateDepartment: Partial<InsertDepartment>): Promise<Department | undefined> {
-    const [department] = await db
-      .update(departments)
-      .set(updateDepartment)
-      .where(eq(departments.id, id))
-      .returning();
-    return department || undefined;
+  async updateDepartment(id: number, data: Partial<InsertDepartment>): Promise<Department | undefined> {
+    const [updatedItem] = await db.update(departments).set(data).where(eq(departments.id, id)).returning();
+    return updatedItem;
   }
   
-  async deleteDepartment(id: number): Promise<void> {
-    // Soft delete by setting isActive to false
-    await db.update(departments).set({ isActive: false }).where(eq(departments.id, id));
+  async toggleDepartmentStatus(id: number, status: boolean): Promise<Department | undefined> {
+    const [item] = await db.update(departments).set({ isActive: status }).where(eq(departments.id, id)).returning();
+    return item;
   }
 
   // Function methods
-  async getAllFunctions(): Promise<Function[]> {
+  async getAllFunctions(showInactive = false): Promise<Function[]> {
+    if (showInactive) {
+      return await db.select().from(functions);
+    }
     return await db.select().from(functions).where(eq(functions.isActive, true));
   }
 
@@ -115,29 +120,25 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(functions);
   }
 
-  async createFunction(insertFunction: InsertFunction): Promise<Function> {
-    const [func] = await db
-      .insert(functions)
-      .values(insertFunction)
-      .returning();
-    return func;
+  async createFunction(data: InsertFunction): Promise<Function> {
+    const [newItem] = await db.insert(functions).values(data).returning();
+    return newItem;
   }
 
-  async updateFunction(id: number, updateFunction: Partial<InsertFunction>): Promise<Function | undefined> {
-    const [func] = await db
-      .update(functions)
-      .set(updateFunction)
-      .where(eq(functions.id, id))
-      .returning();
-    return func || undefined;
+  async updateFunction(id: number, data: Partial<InsertFunction>): Promise<Function | undefined> {
+    const [updatedItem] = await db.update(functions).set(data).where(eq(functions.id, id)).returning();
+    return updatedItem;
   }
 
-  async deleteFunction(id: number): Promise<void> {
-    await db.update(functions).set({ isActive: false }).where(eq(functions.id, id));
+  async toggleFunctionStatus(id: number, status: boolean): Promise<Function | undefined> {
+    const [item] = await db.update(functions).set({ isActive: status }).where(eq(functions.id, id)).returning();
+    return item;
   }
-
   // Employment type methods
-  async getAllEmploymentTypes(): Promise<EmploymentType[]> {
+  async getAllEmploymentTypes(showInactive = false): Promise<EmploymentType[]> {
+    if (showInactive) {
+      return await db.select().from(employmentTypes);
+    }
     return await db.select().from(employmentTypes).where(eq(employmentTypes.isActive, true));
   }
   
@@ -145,28 +146,22 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(employmentTypes);
   }
 
-  async createEmploymentType(insertEmploymentType: InsertEmploymentType): Promise<EmploymentType> {
-    const [type] = await db
-      .insert(employmentTypes)
-      .values(insertEmploymentType)
-      .returning();
-    return type;
+  async createEmploymentType(data: InsertEmploymentType): Promise<EmploymentType> {
+    const [newItem] = await db.insert(employmentTypes).values(data).returning();
+    return newItem;
   }
 
-  async updateEmploymentType(id: number, updateEmploymentType: Partial<InsertEmploymentType>): Promise<EmploymentType | undefined> {
-    const [type] = await db
-      .update(employmentTypes)
-      .set(updateEmploymentType)
-      .where(eq(employmentTypes.id, id))
-      .returning();
-    return type || undefined;
+  async updateEmploymentType(id: number, data: Partial<InsertEmploymentType>): Promise<EmploymentType | undefined> {
+    const [updatedItem] = await db.update(employmentTypes).set(data).where(eq(employmentTypes.id, id)).returning();
+    return updatedItem;
   }
 
-  async deleteEmploymentType(id: number): Promise<void> {
-    await db.update(employmentTypes).set({ isActive: false }).where(eq(employmentTypes.id, id));
+  async toggleEmploymentTypeStatus(id: number, status: boolean): Promise<EmploymentType | undefined> {
+    const [item] = await db.update(employmentTypes).set({ isActive: status }).where(eq(employmentTypes.id, id)).returning();
+    return item;
   }
-
-  // User Methods (rest of the file remains the same...)
+  
+  // User methods
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
@@ -416,6 +411,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Password reset methods
+  async getPasswordResetRequest(id: number): Promise<PasswordResetRequest | undefined> {
+    const [request] = await db.select().from(passwordResetRequests).where(eq(passwordResetRequests.id, id));
+    return request || undefined;
+  }
+
   async createPasswordResetRequest(insertRequest: InsertPasswordResetRequest): Promise<PasswordResetRequest> {
     const [request] = await db
       .insert(passwordResetRequests)

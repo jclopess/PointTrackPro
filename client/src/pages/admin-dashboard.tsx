@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2, Users, Building, Briefcase, FileText, RotateCcw, LogOut } from "lucide-react";
+import { Switch } from "@/components/ui/switch"; 
+import { Plus, Edit, Trash2, Users, Building, Briefcase, FileText, RotateCcw, LogOut, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,23 +18,34 @@ export default function AdminDashboard() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
 
-  // State for modals
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
   const [showFunctionModal, setShowFunctionModal] = useState(false);
   const [showEmploymentTypeModal, setShowEmploymentTypeModal] = useState(false);
 
-  // State for editing and deleting
   const [editingItem, setEditingItem] = useState<any>(null);
-  const [itemToDelete, setItemToDelete] = useState<{type: string, data: any} | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{type: string, data: any} | null>(null);
+  
+  const [showInactiveDepartments, setShowInactiveDepartments] = useState(false);
+  const [showInactiveFunctions, setShowInactiveFunctions] = useState(false);
+  const [showInactiveEmploymentTypes, setShowInactiveEmploymentTypes] = useState(false);
 
 
   // Queries
   const { data: users = [] } = useQuery({ queryKey: ["/api/admin/users"] });
-  const { data: departments = [] } = useQuery({ queryKey: ["/api/admin/departments"] });
-  const { data: functions = [] } = useQuery({ queryKey: ["/api/admin/functions"] });
-  const { data: employmentTypes = [] } = useQuery({ queryKey: ["/api/admin/employment-types"] });
-  const { data: passwordResetRequests = [] } = useQuery({ queryKey: ["/api/admin/password-reset-requests"] });
+  const { data: departments = [], refetch: refetchDepartments } = useQuery({ 
+    queryKey: ["/api/admin/departments", showInactiveDepartments],
+    queryFn: () => apiRequest("GET", `/api/admin/departments?inactive=${showInactiveDepartments}`).then(res => res.json())
+  });
+  const { data: functions = [], refetch: refetchFunctions } = useQuery({ 
+    queryKey: ["/api/admin/functions", showInactiveFunctions],
+    queryFn: () => apiRequest("GET", `/api/admin/functions?inactive=${showInactiveFunctions}`).then(res => res.json())
+  });
+  const { data: employmentTypes = [], refetch: refetchEmploymentTypes } = useQuery({ 
+    queryKey: ["/api/admin/employment-types", showInactiveEmploymentTypes],
+    queryFn: () => apiRequest("GET", `/api/admin/employment-types?inactive=${showInactiveEmploymentTypes}`).then(res => res.json())
+  });
+  const { data: passwordResetRequests = [], refetch: refetchResetRequests } = useQuery({ queryKey: ["/api/admin/password-reset-requests"] });
 
   // Mutations for User
   const createUserMutation = useMutation({
@@ -66,14 +78,19 @@ export default function AdminDashboard() {
     },
   });
 
-  const resetPasswordMutation = useMutation({
-    mutationFn: ({ id, password }: { id: number; password: string }) => 
-      apiRequest("POST", `/api/admin/users/${id}/reset-password`, { password }),
-    onSuccess: () => {
-      toast({ title: "Senha redefinida com sucesso" });
+  const resolvePasswordResetMutation = useMutation({
+    mutationFn: (requestId: number) => 
+        apiRequest("POST", `/api/admin/password-reset-requests/${requestId}/resolve`).then(res => res.json()),
+    onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/password-reset-requests"] });
+        toast({ 
+            title: "Senha redefinida com sucesso!",
+            description: `A nova senha temporária é: ${data.tempPassword}`,
+            duration: 15000,
+        });
     },
     onError: (error: Error) => {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+        toast({ title: "Erro ao redefinir senha", description: error.message, variant: "destructive" });
     },
   });
 
@@ -103,18 +120,14 @@ export default function AdminDashboard() {
     },
   });
 
-  const deleteDepartmentMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/departments/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/departments"] });
-      setItemToDelete(null);
-      toast({ title: "Departamento desativado com sucesso" });
+  const toggleDepartmentStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number, status: boolean }) => apiRequest("PUT", `/api/admin/departments/${id}/toggle`, { status }),
+    onSuccess: (_, variables) => {
+      refetchDepartments();
+      toast({ title: `Departamento ${variables.status ? 'reativado' : 'desativado'} com sucesso` });
     },
-    onError: (error: Error) => {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    },
+    onError: (error: Error) => toast({ title: "Erro", description: error.message, variant: "destructive" })
   });
-
 
   const createFunctionMutation = useMutation({
     mutationFn: (funcData: any) => apiRequest("POST", "/api/admin/functions", funcData),
@@ -142,18 +155,14 @@ export default function AdminDashboard() {
     },
   });
 
-  const deleteFunctionMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/functions/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/functions"] });
-      setItemToDelete(null);
-      toast({ title: "Função desativada com sucesso" });
+  const toggleFunctionStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number, status: boolean }) => apiRequest("PUT", `/api/admin/functions/${id}/toggle`, { status }),
+    onSuccess: (_, variables) => {
+      refetchFunctions();
+      toast({ title: `Função ${variables.status ? 'reativada' : 'desativada'} com sucesso` });
     },
-    onError: (error: Error) => {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    },
+    onError: (error: Error) => toast({ title: "Erro", description: error.message, variant: "destructive" })
   });
-
 
   const createEmploymentTypeMutation = useMutation({
     mutationFn: (typeData: any) => apiRequest("POST", "/api/admin/employment-types", typeData),
@@ -181,16 +190,13 @@ export default function AdminDashboard() {
     },
   });
 
-  const deleteEmploymentTypeMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/employment-types/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/employment-types"] });
-      setItemToDelete(null);
-      toast({ title: "Vínculo desativado com sucesso" });
+  const toggleEmploymentTypeStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number, status: boolean }) => apiRequest("PUT", `/api/admin/employment-types/${id}/toggle`, { status }),
+    onSuccess: (_, variables) => {
+      refetchEmploymentTypes();
+      toast({ title: `Vínculo ${variables.status ? 'reativado' : 'desativado'} com sucesso` });
     },
-    onError: (error: Error) => {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    },
+    onError: (error: Error) => toast({ title: "Erro", description: error.message, variant: "destructive" })
   });
 
 
@@ -282,19 +288,18 @@ export default function AdminDashboard() {
     if (!itemToDelete) return;
     switch (itemToDelete.type) {
       case 'department':
-        deleteDepartmentMutation.mutate(itemToDelete.data.id);
+        toggleDepartmentStatusMutation.mutate({ id: itemToDelete.data.id, status: false });
         break;
       case 'function':
-        deleteFunctionMutation.mutate(itemToDelete.data.id);
+        toggleFunctionStatusMutation.mutate({ id: itemToDelete.data.id, status: false });
         break;
       case 'employmentType':
-        deleteEmploymentTypeMutation.mutate(itemToDelete.data.id);
+        toggleEmploymentTypeStatusMutation.mutate({ id: itemToDelete.data.id, status: false });
         break;
       default:
         break;
     }
   };
-
 
   if (user?.role !== "admin") {
     return (
@@ -391,7 +396,7 @@ export default function AdminDashboard() {
                           onClick={() => {
                             const newPassword = prompt("Nova senha:");
                             if (newPassword) {
-                              resetPasswordMutation.mutate({ id: user.id, password: newPassword });
+                              updateUserMutation.mutate({ id: user.id, password: newPassword });
                             }
                           }}
                         >
@@ -410,36 +415,34 @@ export default function AdminDashboard() {
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle className="flex items-center gap-2">
-                    <Building className="h-5 w-5" />
-                    Gerenciamento de Departamentos
-                  </CardTitle>
-                  <Button onClick={() => handleOpenDepartmentModal()}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Novo Departamento
-                  </Button>
+                  <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5" />Departamentos</CardTitle>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch id="inactive-depts" checked={showInactiveDepartments} onCheckedChange={setShowInactiveDepartments} />
+                      <Label htmlFor="inactive-depts">Mostrar inativos</Label>
+                    </div>
+                    <Button onClick={() => handleOpenDepartmentModal()}><Plus className="h-4 w-4 mr-2" />Novo</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {departments.map((dept: any) => (
                     <div key={dept.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <h3 className="font-medium">{dept.name}</h3>
-                        <p className="text-sm text-gray-500">{dept.description}</p>
-                      </div>
                       <div className="flex items-center gap-4">
-                        <Badge variant={dept.isActive ? "default" : "secondary"}>
-                          {dept.isActive ? "Ativo" : "Inativo"}
-                        </Badge>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleOpenDepartmentModal(dept)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => setItemToDelete({ type: 'department', data: dept })}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <div>
+                          <h3 className="font-medium">{dept.name}</h3>
+                          <p className="text-sm text-gray-500">{dept.description}</p>
                         </div>
+                        <Badge variant={dept.isActive ? "default" : "secondary"}>{dept.isActive ? "Ativo" : "Inativo"}</Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleOpenDepartmentModal(dept)}><Edit className="h-4 w-4" /></Button>
+                        {dept.isActive ? (
+                           <Button variant="destructive" size="sm" onClick={() => toggleDepartmentStatusMutation.mutate({ id: dept.id, status: false })}><Trash2 className="h-4 w-4" /></Button>
+                        ) : (
+                           <Button variant="ghost" size="sm" onClick={() => toggleDepartmentStatusMutation.mutate({ id: dept.id, status: true })}><RefreshCw className="h-4 w-4 text-green-600" /></Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -453,36 +456,34 @@ export default function AdminDashboard() {
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle className="flex items-center gap-2">
-                    <Briefcase className="h-5 w-5" />
-                    Gerenciamento de Funções
-                  </CardTitle>
-                  <Button onClick={() => handleOpenFunctionModal()}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nova Função
-                  </Button>
+                  <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5" />Funções</CardTitle>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch id="inactive-funcs" checked={showInactiveFunctions} onCheckedChange={setShowInactiveFunctions} />
+                      <Label htmlFor="inactive-funcs">Mostrar inativos</Label>
+                    </div>
+                    <Button onClick={() => handleOpenFunctionModal()}><Plus className="h-4 w-4 mr-2" />Nova</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {functions.map((func: any) => (
                     <div key={func.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <h3 className="font-medium">{func.name}</h3>
-                        <p className="text-sm text-gray-500">{func.description}</p>
-                      </div>
                       <div className="flex items-center gap-4">
-                        <Badge variant={func.isActive ? "default" : "secondary"}>
-                          {func.isActive ? "Ativo" : "Inativo"}
-                        </Badge>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleOpenFunctionModal(func)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => setItemToDelete({ type: 'function', data: func })}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <div>
+                          <h3 className="font-medium">{func.name}</h3>
+                          <p className="text-sm text-gray-500">{func.description}</p>
                         </div>
+                        <Badge variant={func.isActive ? "default" : "secondary"}>{func.isActive ? "Ativo" : "Inativo"}</Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleOpenFunctionModal(func)}><Edit className="h-4 w-4" /></Button>
+                        {func.isActive ? (
+                           <Button variant="destructive" size="sm" onClick={() => toggleFunctionStatusMutation.mutate({ id: func.id, status: false })}><Trash2 className="h-4 w-4" /></Button>
+                        ) : (
+                           <Button variant="ghost" size="sm" onClick={() => toggleFunctionStatusMutation.mutate({ id: func.id, status: true })}><RefreshCw className="h-4 w-4 text-green-600" /></Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -494,39 +495,37 @@ export default function AdminDashboard() {
           {/* Employment Types Tab */}
           <TabsContent value="employment-types">
             <Card>
-              <CardHeader>
+               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Gerenciamento de Vínculos
-                  </CardTitle>
-                  <Button onClick={() => handleOpenEmploymentTypeModal()}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Novo Vínculo
-                  </Button>
+                  <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Vínculos</CardTitle>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch id="inactive-types" checked={showInactiveEmploymentTypes} onCheckedChange={setShowInactiveEmploymentTypes} />
+                      <Label htmlFor="inactive-types">Mostrar inativos</Label>
+                    </div>
+                    <Button onClick={() => handleOpenEmploymentTypeModal()}><Plus className="h-4 w-4 mr-2" />Novo</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {employmentTypes.map((type: any) => (
-                    <div key={type.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <h3 className="font-medium">{type.name}</h3>
-                        <p className="text-sm text-gray-500">{type.description}</p>
-                        <p className="text-sm text-blue-600">{type.dailyWorkHours}h por dia</p>
-                      </div>
+                     <div key={type.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex items-center gap-4">
-                        <Badge variant={type.isActive ? "default" : "secondary"}>
-                          {type.isActive ? "Ativo" : "Inativo"}
-                        </Badge>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleOpenEmploymentTypeModal(type)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => setItemToDelete({ type: 'employmentType', data: type })}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <div>
+                          <h3 className="font-medium">{type.name}</h3>
+                          <p className="text-sm text-gray-500">{type.description}</p>
+                          <p className="text-sm text-blue-600">{type.dailyWorkHours}h por dia</p>
                         </div>
+                        <Badge variant={type.isActive ? "default" : "secondary"}>{type.isActive ? "Ativo" : "Inativo"}</Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleOpenEmploymentTypeModal(type)}><Edit className="h-4 w-4" /></Button>
+                        {type.isActive ? (
+                           <Button variant="destructive" size="sm" onClick={() => toggleEmploymentTypeStatusMutation.mutate({ id: type.id, status: false })}><Trash2 className="h-4 w-4" /></Button>
+                        ) : (
+                           <Button variant="ghost" size="sm" onClick={() => toggleEmploymentTypeStatusMutation.mutate({ id: type.id, status: true })}><RefreshCw className="h-4 w-4 text-green-600" /></Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -555,12 +554,8 @@ export default function AdminDashboard() {
                         </p>
                       </div>
                       <Button
-                        onClick={() => {
-                          const newPassword = prompt("Nova senha para o usuário:");
-                          if (newPassword) {
-                            toast({ title: "Funcionalidade em desenvolvimento" });
-                          }
-                        }}
+                        onClick={() => resolvePasswordResetMutation.mutate(request.id)}
+                        disabled={resolvePasswordResetMutation.isPending}
                       >
                         Resolver
                       </Button>
@@ -610,7 +605,7 @@ export default function AdminDashboard() {
                 <Select name="departmentId" required defaultValue={editingItem?.departmentId?.toString()}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {departments.map((dept: any) => (
+                    {departments.filter((item) => item.isActive).map((dept: any) => (
                       <SelectItem key={dept.id} value={dept.id.toString()}>
                         {dept.name}
                       </SelectItem>
@@ -623,7 +618,7 @@ export default function AdminDashboard() {
                 <Select name="functionId" required defaultValue={editingItem?.functionId?.toString()}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {functions.map((func: any) => (
+                    {functions.filter((item) => item.isActive).map((func: any) => (
                       <SelectItem key={func.id} value={func.id.toString()}>
                         {func.name}
                       </SelectItem>
@@ -636,7 +631,7 @@ export default function AdminDashboard() {
                 <Select name="employmentTypeId" required defaultValue={editingItem?.employmentTypeId?.toString()}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {employmentTypes.map((type: any) => (
+                    {employmentTypes.filter((item) => item.isActive).map((type: any) => (
                       <SelectItem key={type.id} value={type.id.toString()}>
                         {type.name}
                       </SelectItem>
@@ -672,7 +667,7 @@ export default function AdminDashboard() {
                 Cancelar
               </Button>
               <Button type="submit" disabled={createUserMutation.isPending || updateUserMutation.isPending}>
-                {editingItem ? "Salvar Alterações" : "Criar Usuário"}
+                {editingItem ? "Atualizar" : "Criar"}
               </Button>
             </div>
           </form>
@@ -789,7 +784,7 @@ export default function AdminDashboard() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setItemToDelete(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleteDepartmentMutation.isPending || deleteFunctionMutation.isPending || deleteEmploymentTypeMutation.isPending}>
+            <Button variant="destructive" onClick={handleDelete} disabled={toggleDepartmentStatusMutation.isPending || toggleFunctionStatusMutation.isPending || toggleEmploymentTypeStatusMutation.isPending}>
               Desativar
             </Button>
           </DialogFooter>

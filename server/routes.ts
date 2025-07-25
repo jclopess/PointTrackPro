@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth, hashPassword } from "./auth";
+import { setupAuth, hashPassword } from "./auth"; // Importa a função hashPassword
 import { storage } from "./storage";
 import { insertTimeRecordSchema, insertJustificationSchema, insertDepartmentSchema, insertUserSchema, insertFunctionSchema, insertEmploymentTypeSchema } from "@shared/schema";
 import { z } from "zod";
@@ -8,7 +8,6 @@ import { z } from "zod";
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // --- Helpers de Autenticação ---
   const requireAuth = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
@@ -17,7 +16,7 @@ export function registerRoutes(app: Express): Server {
   };
 
   const requireManager = (req: any, res: any, next: any) => {
-    if (!req.isAuthenticated() || !["manager", "admin"].includes(req.user.role)) {
+    if (!req.isAuthenticated() || req.user.role !== "manager") {
       return res.status(403).json({ message: "Manager access required" });
     }
     next();
@@ -53,14 +52,11 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+
   // Admin routes for departments
-  app.get("/api/admin/departments", requireAdmin, async (req, res, next) => {
-    try {
-      const departments = await storage.getAllDepartmentsForAdmin();
-      res.json(departments);
-    } catch (error) {
-      next(error);
-    }
+  app.get("/api/admin/departments", requireAdmin, async (req, res) => {
+    const showInactive = req.query.inactive === 'true';
+    res.json(await storage.getAllDepartments(showInactive));
   });
 
   app.post("/api/admin/departments", requireAdmin, async (req, res, next) => {
@@ -81,23 +77,17 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.delete("/api/admin/departments/:id", requireAdmin, async (req, res, next) => {
-    try {
-      await storage.deleteDepartment(Number(req.params.id));
-      res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
+  app.put("/api/admin/departments/:id/toggle", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { status } = req.body;
+    res.json(await storage.toggleDepartmentStatus(id, status));
   });
 
+
   // Admin routes for functions
-  app.get("/api/admin/functions", requireAdmin, async (req, res, next) => {
-    try {
-      const functions = await storage.getAllFunctionsForAdmin();
-      res.json(functions);
-    } catch (error) {
-      next(error);
-    }
+  app.get("/api/admin/functions", requireAdmin, async (req, res) => {
+    const showInactive = req.query.inactive === 'true';
+    res.json(await storage.getAllFunctions(showInactive));
   });
 
   app.post("/api/admin/functions", requireAdmin, async (req, res, next) => {
@@ -118,23 +108,16 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.delete("/api/admin/functions/:id", requireAdmin, async (req, res, next) => {
-    try {
-      await storage.deleteFunction(Number(req.params.id));
-      res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
+  app.put("/api/admin/functions/:id/toggle", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { status } = req.body;
+    res.json(await storage.toggleFunctionStatus(id, status));
   });
 
   // Admin routes for employment types
-  app.get("/api/admin/employment-types", requireAdmin, async (req, res, next) => {
-    try {
-      const types = await storage.getAllEmploymentTypesForAdmin();
-      res.json(types);
-    } catch (error) {
-      next(error);
-    }
+  app.get("/api/admin/employment-types", requireAdmin, async (req, res) => {
+    const showInactive = req.query.inactive === 'true';
+    res.json(await storage.getAllEmploymentTypes(showInactive));
   });
 
   app.post("/api/admin/employment-types", requireAdmin, async (req, res, next) => {
@@ -155,20 +138,46 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.delete("/api/admin/employment-types/:id", requireAdmin, async (req, res, next) => {
-    try {
-      await storage.deleteEmploymentType(Number(req.params.id));
-      res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
+  app.put("/api/admin/employment-types/:id/toggle", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { status } = req.body;
+    res.json(await storage.toggleEmploymentTypeStatus(id, status));
   });
-  app.get("/api/admin/password-reset-requests", requireAdmin, async (req, res) => {
+
+  // Admin routes for password reset
+  app.get("/api/admin/password-reset-requests", requireAdmin, async (req, res, next) => {
     try {
       const requests = await storage.getPendingPasswordResetRequests();
       res.json(requests);
     } catch (error) {
-      res.status(500).json({ error: (error as Error).message });
+      next(error);
+    }
+  });
+
+  app.post("/api/admin/password-reset-requests/:id/resolve", requireAdmin, async (req, res, next) => {
+    try {
+        const requestId = Number(req.params.id);
+        const adminId = req.user.id;
+
+        const request = await storage.getPasswordResetRequest(requestId);
+        if (!request || request.status !== 'pending') {
+            return res.status(404).json({ message: "Solicitação não encontrada ou já resolvida." });
+        }
+
+        const userToReset = await storage.getUserByCpf(request.cpf);
+        if (!userToReset) {
+            return res.status(404).json({ message: "Usuário associado à solicitação não encontrado." });
+        }
+
+        const tempPassword = userToReset.cpf.replace(/\D/g, '').substring(0, 6);
+        const hashedPassword = await hashPassword(tempPassword);
+
+        await storage.updateUser(userToReset.id, { password: hashedPassword });
+        await storage.resolvePasswordResetRequest(requestId, adminId);
+
+        res.json({ tempPassword });
+    } catch (error) {
+        next(error);
     }
   });
 
@@ -192,7 +201,6 @@ export function registerRoutes(app: Express): Server {
       next(error);
     }
   });
-
   app.post("/api/time-records", requireAuth, async (req, res, next) => {
     try {
       const userId = req.user.id;
@@ -250,31 +258,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Rota para ATUALIZAR um usuário
-  app.put("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
-    try {
-        const id = parseInt(req.params.id);
-        // Omitimos a senha para garantir que ela não seja atualizada por esta rota
-        const validatedData = insertUserSchema.omit({ password: true }).partial().parse(req.body);
-
-        const updatedUser = await storage.updateUser(id, validatedData);
-        if (!updatedUser) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        res.json(updatedUser);
-
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
-        }
-        if (error instanceof Error && 'code' in error && error.code === '23505') {
-            return res.status(409).json({ message: "O CPF ou nome de usuário informado já está em uso." });
-        }
-        next(error);
-    }
-  });
-  
-  // Rota de criação de usuário
+  // Rota de criação de usuário atualizada
   app.post("/api/admin/users", requireAdmin, async (req, res, next) => {
     try {
         // Remove a senha do body para garantir que não seja usada
@@ -306,7 +290,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
- 
+  // ... (o resto das suas rotas continua aqui)
   
   const httpServer = createServer(app);
   return httpServer;
