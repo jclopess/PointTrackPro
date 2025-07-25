@@ -672,7 +672,7 @@ export default function AdminDashboard() {
                 Cancelar
               </Button>
               <Button type="submit" disabled={createUserMutation.isPending || updateUserMutation.isPending}>
-                {editingItem ? "Atualizar" : "Criar"}
+                {editingItem ? "Salvar Alterações" : "Criar Usuário"}
               </Button>
             </div>
           </form>

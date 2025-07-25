@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth, hashPassword } from "./auth"; // Importa a função hashPassword
+import { setupAuth, hashPassword } from "./auth";
 import { storage } from "./storage";
 import { insertTimeRecordSchema, insertJustificationSchema, insertDepartmentSchema, insertUserSchema, insertFunctionSchema, insertEmploymentTypeSchema } from "@shared/schema";
 import { z } from "zod";
@@ -8,6 +8,7 @@ import { z } from "zod";
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
+  // --- Helpers de Autenticação ---
   const requireAuth = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
@@ -16,7 +17,7 @@ export function registerRoutes(app: Express): Server {
   };
 
   const requireManager = (req: any, res: any, next: any) => {
-    if (!req.isAuthenticated() || req.user.role !== "manager") {
+    if (!req.isAuthenticated() || !["manager", "admin"].includes(req.user.role)) {
       return res.status(403).json({ message: "Manager access required" });
     }
     next();
@@ -51,7 +52,6 @@ export function registerRoutes(app: Express): Server {
       next(error);
     }
   });
-
 
   // Admin routes for departments
   app.get("/api/admin/departments", requireAdmin, async (req, res, next) => {
@@ -89,7 +89,6 @@ export function registerRoutes(app: Express): Server {
       next(error);
     }
   });
-
 
   // Admin routes for functions
   app.get("/api/admin/functions", requireAdmin, async (req, res, next) => {
@@ -164,9 +163,15 @@ export function registerRoutes(app: Express): Server {
       next(error);
     }
   });
+  app.get("/api/admin/password-reset-requests", requireAdmin, async (req, res) => {
+    try {
+      const requests = await storage.getPendingPasswordResetRequests();
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
 
-
-  // ... (outras rotas permanecem iguais)
   app.get("/api/departments", async (req, res) => {
     try {
       const departments = await storage.getAllDepartments();
@@ -245,7 +250,31 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Rota de criação de usuário atualizada
+  // Rota para ATUALIZAR um usuário
+  app.put("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
+    try {
+        const id = parseInt(req.params.id);
+        // Omitimos a senha para garantir que ela não seja atualizada por esta rota
+        const validatedData = insertUserSchema.omit({ password: true }).partial().parse(req.body);
+
+        const updatedUser = await storage.updateUser(id, validatedData);
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.json(updatedUser);
+
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
+        }
+        if (error instanceof Error && 'code' in error && error.code === '23505') {
+            return res.status(409).json({ message: "O CPF ou nome de usuário informado já está em uso." });
+        }
+        next(error);
+    }
+  });
+  
+  // Rota de criação de usuário
   app.post("/api/admin/users", requireAdmin, async (req, res, next) => {
     try {
         // Remove a senha do body para garantir que não seja usada
@@ -277,7 +306,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // ... (o resto das suas rotas continua aqui)
+ 
   
   const httpServer = createServer(app);
   return httpServer;
