@@ -295,17 +295,27 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(justifications.createdAt));
   }
 
-  async getPendingJustifications(): Promise<(Justification & { user: User })[]> {
-    return await db
+  // MÉTODO ATUALIZADO
+  async getPendingJustifications(departmentId?: number): Promise<(Justification & { user: User })[]> {
+    let query = db
       .select()
       .from(justifications)
       .innerJoin(users, eq(justifications.userId, users.id))
       .where(eq(justifications.status, "pending"))
       .orderBy(desc(justifications.createdAt))
-      .then(results => results.map(result => ({
-        ...result.justifications,
-        user: result.users
-      })));
+      .$dynamic();
+      
+    // Se um departmentId for fornecido, adiciona o filtro
+    if (departmentId) {
+      query = query.where(eq(users.departmentId, departmentId));
+    }
+
+    const results = await query;
+
+    return results.map(result => ({
+      ...result.justifications,
+      user: result.users
+    }));
   }
 
   async approveJustification(id: number, approverId: number, approved: boolean): Promise<Justification | undefined> {

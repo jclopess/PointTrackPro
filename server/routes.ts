@@ -261,7 +261,6 @@ export function registerRoutes(app: Express): Server {
   // Rota de criação de usuário atualizada
   app.post("/api/admin/users", requireAdmin, async (req, res, next) => {
     try {
-        // Remove a senha do body para garantir que não seja usada
         const { password, ...userDataFromRequest } = req.body;
 
         const validatedData = insertUserSchema.omit({ password: true }).parse(userDataFromRequest);
@@ -290,8 +289,182 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // ... (o resto das suas rotas continua aqui)
-  
+  // Submit justification
+  app.post("/api/justifications", requireAuth, async (req, res, next) => {
+    try {
+      const validatedData = insertJustificationSchema.parse({
+        ...req.body,
+        userId: req.user.id,
+      });
+      
+      const justification = await storage.createJustification(validatedData);
+      res.status(201).json(justification);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      next(error);
+    }
+  });
+
+  // Get justifications for user
+  app.get("/api/justifications", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const justifications = await storage.getJustificationsForUser(userId);
+      res.json(justifications);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Manager endpoints
+  app.get("/api/manager/employees", requireManager, async (req, res, next) => {
+    try {
+      const employees = await storage.getAllEmployees();
+      res.json(employees);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/manager/time-records/:date", requireManager, async (req, res, next) => {
+    try {
+      const date = req.params.date;
+      const records = await storage.getAllTimeRecordsForDate(date);
+      res.json(records);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/manager/justifications/pending", requireManager, async (req, res, next) => {
+    try {
+      const justifications = await storage.getPendingJustifications();
+      res.json(justifications);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+
+  app.post("/api/manager/justifications/:id/approve", requireManager, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { approved } = req.body;
+      const justification = await storage.approveJustification(id, req.user.id, approved);
+      
+      if (!justification) {
+        return res.status(404).json({ message: "Justification not found" });
+      }
+      
+      res.json(justification);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/manager/time-records/:id", requireManager, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      // Recalculate total hours if times are updated
+      if (updateData.entry1 || updateData.exit1 || updateData.entry2 || updateData.exit2) {
+        const record = await storage.updateTimeRecord(id, updateData);
+        if (record && record.entry1 && record.exit1 && record.entry2 && record.exit2) {
+          const entry1Minutes = parseInt(record.entry1.split(':')[0]) * 60 + parseInt(record.entry1.split(':')[1]);
+          const exit1Minutes = parseInt(record.exit1.split(':')[0]) * 60 + parseInt(record.exit1.split(':')[1]);
+          const entry2Minutes = parseInt(record.entry2.split(':')[0]) * 60 + parseInt(record.entry2.split(':')[1]);
+          const exit2Minutes = parseInt(record.exit2.split(':')[0]) * 60 + parseInt(record.exit2.split(':')[1]);
+          
+          const totalMinutes = (exit1Minutes - entry1Minutes) + (exit2Minutes - entry2Minutes);
+          const totalHours = totalMinutes / 60;
+          
+          await storage.updateTimeRecord(id, { totalHours: totalHours.toFixed(2) });
+        if (error instanceof z.ZodError) {
+            return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
+        }
+      }
+      
+      const timeRecord = await storage.updateTimeRecord(id, updateData);
+      if (!timeRecord) {
+        return res.status(404).json({ message: "Time record not found" });
+      }
+      
+      res.json(timeRecord);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/manager/hour-bank/:userId/:month", requireManager, async (req, res, next) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const month = req.params.month;
+      const hourBank = await storage.calculateHourBank(userId, month);
+      res.json(hourBank);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin routes
+  app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  app.get("/api/admin/functions", requireAdmin, async (req, res) => {
+    try {
+      const functions = await storage.getAllFunctions();
+      res.json(functions);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  app.get("/api/admin/employment-types", requireAdmin, async (req, res) => {
+    try {
+      const types = await storage.getAllEmploymentTypes();
+      res.json(types);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  app.get("/api/admin/password-reset-requests", requireAdmin, async (req, res) => {
+    try {
+      const requests = await storage.getPendingPasswordResetRequests();
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      const user = await storage.createUser(userData);
+      res.status(201).json(user);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+
+
+
+
+
+
+
+
+
   const httpServer = createServer(app);
   return httpServer;
 }
