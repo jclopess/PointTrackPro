@@ -13,6 +13,7 @@ import { Plus, Edit, Trash2, Users, Building, Briefcase, FileText, RotateCcw, Lo
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import InputMask from "react-input-mask";
 
 export default function AdminDashboard() {
   const { user, logoutMutation } = useAuth();
@@ -584,10 +585,17 @@ export default function AdminDashboard() {
           </DialogHeader>
           <form onSubmit={handleUserSubmit}>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>CPF</Label>
-                <Input name="cpf" placeholder="000.000.000-00" required defaultValue={editingItem?.cpf} />
-              </div>
+                <div>
+                  <Label htmlFor="cpf">CPF</Label>
+                  <InputMask
+                    mask="999.999.999-99"
+                    defaultValue={editingItem?.cpf}
+                    name="cpf"
+                  >
+                    {(inputProps: any) => <Input {...inputProps} id="cpf" type="text" required />}
+                  </InputMask>
+                </div>
+
               <div>
                 <Label>Nome Completo</Label>
                 <Input name="name" placeholder="Nome completo" required defaultValue={editingItem?.name} />

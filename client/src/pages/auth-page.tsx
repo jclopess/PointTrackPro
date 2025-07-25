@@ -11,6 +11,7 @@ import { Redirect } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import InputMask from "react-input-mask";
 
 export default function AuthPage() {
   const { user, loginMutation } = useAuth();
@@ -66,12 +67,13 @@ export default function AuthPage() {
           </div>
 
           {!showPasswordReset ? (
+            // Formulário de Login
             <div className="space-y-6">
               <Card>
                 <CardContent className="p-6">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="username">Usuário/CPF</Label>
+                      <Label htmlFor="username">Usuário</Label>
                       <Input
                         id="username"
                         type="text"
@@ -114,33 +116,26 @@ export default function AuthPage() {
           ) : (
             <div className="space-y-6">
               <Card>
-                <CardContent className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold">Recuperar Senha</h3>
-                    <p className="text-sm text-gray-600">
-                      Digite seu CPF para solicitar a recuperação da senha
-                    </p>
-                  </div>
-                  
-                  <form onSubmit={handlePasswordReset} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="reset-cpf">CPF</Label>
-                      <Input
-                        id="reset-cpf"
-                        type="text"
-                        placeholder="000.000.000-00"
-                        value={resetForm.cpf}
-                        onChange={(e) => setResetForm({ ...resetForm, cpf: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={passwordResetMutation.isPending}
+              <CardContent className="p-6">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold">Recuperar Senha</h3>
+                  <p className="text-sm text-gray-600">Digite seu CPF para solicitar a recuperação da senha</p>
+                </div>
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-cpf">CPF</Label>
+                    {/* Substituído pelo InputMask */}
+                    <InputMask
+                      mask="999.999.999-99"
+                      value={resetForm.cpf}
+                      onChange={(e) => setResetForm({ ...resetForm, cpf: e.target.value })}
                     >
-                      {passwordResetMutation.isPending ? "Enviando..." : "Solicitar Reset de Senha"}
-                    </Button>
+                      {(inputProps: any) => <Input {...inputProps} id="reset-cpf" type="text" required />}
+                    </InputMask>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={passwordResetMutation.isPending}>
+                    {passwordResetMutation.isPending ? "Enviando..." : "Solicitar Reset de Senha"}
+                  </Button>
                     <p className="text-sm text-gray-600 text-center">
                       Sua solicitação será enviada para o gestor, que entrará em contato para regularizar seu acesso.
                     </p>
