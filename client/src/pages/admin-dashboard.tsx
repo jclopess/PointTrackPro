@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch"; 
 import { Plus, Edit, Trash2, Users, Building, Briefcase, FileText, RotateCcw, LogOut, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import InputMask from "react-input-mask";
@@ -34,7 +34,7 @@ export default function AdminDashboard() {
 
 
   // Queries
-  const { data: users = [] } = useQuery({ queryKey: ["/api/admin/users"] });
+  const { data: users = [], refetch: refetchUsers } = useQuery({ queryKey: ["/api/admin/users"] });
   const { data: departments = [], refetch: refetchDepartments } = useQuery({ 
     queryKey: ["/api/admin/departments", showInactiveDepartments],
     queryFn: () => apiRequest("GET", `/api/admin/departments?inactive=${showInactiveDepartments}`).then(res => res.json())
@@ -51,11 +51,24 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/password-reset-requests"] 
   });
 
+  // REFETCH AUTOMÁTICO
+  useEffect(() => {
+    refetchDepartments();
+  }, [showInactiveDepartments, refetchDepartments]);
+
+  useEffect(() => {
+    refetchFunctions();
+  }, [showInactiveFunctions, refetchFunctions]);
+
+  useEffect(() => {
+    refetchEmploymentTypes();
+  }, [showInactiveEmploymentTypes, refetchEmploymentTypes]);
+
   // Mutations for User
   const createUserMutation = useMutation({
     mutationFn: (userData: any) => apiRequest("POST", "/api/admin/users", userData).then(res => res.json()),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      refetchUsers();
       setShowUserModal(false);
       setEditingItem(null);
       toast({
@@ -72,7 +85,7 @@ export default function AdminDashboard() {
   const updateUserMutation = useMutation({
     mutationFn: ({ id, ...userData }: any) => apiRequest("PUT", `/api/admin/users/${id}`, userData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      refetchUsers();
       setShowUserModal(false);
       setEditingItem(null);
       toast({ title: "Usuário atualizado com sucesso" });
@@ -86,7 +99,7 @@ export default function AdminDashboard() {
     mutationFn: ({ requestId, newPassword }: { requestId: number; newPassword: string; }) =>
       apiRequest("POST", `/api/admin/password-reset/${requestId}/resolve`, { newPassword }),
     onSuccess: () => {
-      refetchResetRequests(); // Atualiza a lista de solicitações
+      refetchResetRequests();
       toast({ title: "Senha redefinida com sucesso!" });
     },
     onError: (error: Error) => {
@@ -97,7 +110,7 @@ export default function AdminDashboard() {
   const createDepartmentMutation = useMutation({
     mutationFn: (deptData: any) => apiRequest("POST", "/api/admin/departments", deptData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/departments"] });
+      refetchDepartments();
       setShowDepartmentModal(false);
       setEditingItem(null);
       toast({ title: "Departamento criado com sucesso" });
@@ -110,7 +123,7 @@ export default function AdminDashboard() {
   const updateDepartmentMutation = useMutation({
     mutationFn: ({ id, ...deptData }: any) => apiRequest("PUT", `/api/admin/departments/${id}`, deptData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/departments"] });
+      refetchDepartments();
       setShowDepartmentModal(false);
       setEditingItem(null);
       toast({ title: "Departamento atualizado com sucesso" });
@@ -132,7 +145,7 @@ export default function AdminDashboard() {
   const createFunctionMutation = useMutation({
     mutationFn: (funcData: any) => apiRequest("POST", "/api/admin/functions", funcData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/functions"] });
+      refetchFunctions;
       setShowFunctionModal(false);
       setEditingItem(null);
       toast({ title: "Função criada com sucesso" });
@@ -145,7 +158,7 @@ export default function AdminDashboard() {
   const updateFunctionMutation = useMutation({
     mutationFn: ({ id, ...funcData }: any) => apiRequest("PUT", `/api/admin/functions/${id}`, funcData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/functions"] });
+      refetchFunctions;
       setShowFunctionModal(false);
       setEditingItem(null);
       toast({ title: "Função atualizada com sucesso" });
@@ -167,7 +180,7 @@ export default function AdminDashboard() {
   const createEmploymentTypeMutation = useMutation({
     mutationFn: (typeData: any) => apiRequest("POST", "/api/admin/employment-types", typeData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/employment-types"] });
+      refetchEmploymentTypes;
       setShowEmploymentTypeModal(false);
       setEditingItem(null);
       toast({ title: "Vínculo criado com sucesso" });
@@ -180,7 +193,7 @@ export default function AdminDashboard() {
   const updateEmploymentTypeMutation = useMutation({
     mutationFn: ({ id, ...typeData }: any) => apiRequest("PUT", `/api/admin/employment-types/${id}`, typeData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/employment-types"] });
+      refetchEmploymentTypes;
       setShowEmploymentTypeModal(false);
       setEditingItem(null);
       toast({ title: "Vínculo atualizado com sucesso" });
