@@ -14,6 +14,7 @@ import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import InputMask from "react-input-mask";
+import { type PasswordResetRequest } from "@shared/schema";
 
 export default function AdminDashboard() {
   const { user, logoutMutation } = useAuth();
@@ -46,7 +47,9 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/employment-types", showInactiveEmploymentTypes],
     queryFn: () => apiRequest("GET", `/api/admin/employment-types?inactive=${showInactiveEmploymentTypes}`).then(res => res.json())
   });
-  const { data: passwordResetRequests = [], refetch: refetchResetRequests } = useQuery({ queryKey: ["/api/admin/password-reset-requests"] });
+  const { data: passwordResetRequests = [], refetch: refetchResetRequests } = useQuery<PasswordResetRequest[]>({
+    queryKey: ["/api/admin/password-reset-requests"] 
+  });
 
   // Mutations for User
   const createUserMutation = useMutation({
@@ -80,18 +83,14 @@ export default function AdminDashboard() {
   });
 
   const resolvePasswordResetMutation = useMutation({
-    mutationFn: (requestId: number) => 
-        apiRequest("POST", `/api/admin/password-reset-requests/${requestId}/resolve`).then(res => res.json()),
-    onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/password-reset-requests"] });
-        toast({ 
-            title: "Senha redefinida com sucesso!",
-            description: `A nova senha temporária é: ${data.tempPassword}`,
-            duration: 15000,
-        });
+    mutationFn: ({ requestId, newPassword }: { requestId: number; newPassword: string; }) =>
+      apiRequest("POST", `/api/admin/password-reset/${requestId}/resolve`, { newPassword }),
+    onSuccess: () => {
+      refetchResetRequests(); // Atualiza a lista de solicitações
+      toast({ title: "Senha redefinida com sucesso!" });
     },
     onError: (error: Error) => {
-        toast({ title: "Erro ao redefinir senha", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao redefinir senha", description: error.message, variant: "destructive" });
     },
   });
 
@@ -202,6 +201,22 @@ export default function AdminDashboard() {
 
 
   // Handlers
+  const handleResolvePasswordReset = (request: any) => {
+    const newPassword = prompt(`Digite a NOVA senha para o usuário com CPF: ${request.cpf}`);
+    if (newPassword && newPassword.length >= 6) {
+      resolvePasswordResetMutation.mutate({ 
+        requestId: request.id,
+        newPassword: newPassword,
+      });
+    } else if (newPassword) {
+      toast({
+        title: "Senha muito curta",
+        description: "A nova senha precisa ter no mínimo 6 caracteres.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleUserSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
@@ -536,41 +551,41 @@ export default function AdminDashboard() {
           </TabsContent>
           
           {/* Password Reset Requests Tab */}
-          <TabsContent value="password-resets">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Solicitações de Reset de Senha
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {passwordResetRequests.filter((req: any) => req.status === "pending").map((request: any) => (
-                    <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <h3 className="font-medium">CPF: {request.cpf}</h3>
-                        <p className="text-sm text-gray-500">
-                          Solicitado em: {new Date(request.requestedAt).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <Button
-                        onClick={() => resolvePasswordResetMutation.mutate(request.id)}
-                        disabled={resolvePasswordResetMutation.isPending}
-                      >
-                        Resolver
-                      </Button>
-                    </div>
-                  ))}
-                  {passwordResetRequests.filter((req: any) => req.status === "pending").length === 0 && (
-                    <p className="text-center text-gray-500 py-8">
-                      Nenhuma solicitação pendente
+      <TabsContent value="password-resets">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Solicitações de Reset de Senha
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {passwordResetRequests.map((request: any) => (
+                <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-medium">CPF: {request.cpf}</h3>
+                    <p className="text-sm text-gray-500">
+                      Solicitado em: {new Date(request.requestedAt).toLocaleString('pt-BR')}
                     </p>
-                  )}
+                  </div>
+                  <Button
+                    onClick={() => handleResolvePasswordReset(request)}
+                    disabled={resolvePasswordResetMutation.isPending}
+                  >
+                    Resolver
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              ))}
+              {passwordResetRequests.length === 0 && (
+                <p className="text-center text-gray-500 py-8">
+                  Nenhuma solicitação pendente
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
         </Tabs>
       </div>
       

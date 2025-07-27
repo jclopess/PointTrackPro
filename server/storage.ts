@@ -14,29 +14,26 @@ export interface IStorage {
   getAllDepartmentsForAdmin(): Promise<Department[]>;
   createDepartment(department: InsertDepartment): Promise<Department>;
   updateDepartment(id: number, department: Partial<InsertDepartment>): Promise<Department | undefined>;
-  deleteDepartment(id: number): Promise<void>;
-
+  
   // Function methods
   getAllFunctions(): Promise<Function[]>;
   getAllFunctionsForAdmin(): Promise<Function[]>;
   createFunction(func: InsertFunction): Promise<Function>;
   updateFunction(id: number, func: Partial<InsertFunction>): Promise<Function | undefined>;
-  deleteFunction(id: number): Promise<void>;
-
+  
   // Employment Type methods
   getAllEmploymentTypes(): Promise<EmploymentType[]>;
   getAllEmploymentTypesForAdmin(): Promise<EmploymentType[]>;
   createEmploymentType(type: InsertEmploymentType): Promise<EmploymentType>;
   updateEmploymentType(id: number, type: Partial<InsertEmploymentType>): Promise<EmploymentType | undefined>;
-  deleteEmploymentType(id: number): Promise<void>;
-  
+    
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByCpf(cpf: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
-  getAllEmployees(): Promise<(User & { department: Department | null })[]>;
+  getAllEmployees(departmentId: number): Promise<(User & { department: Department | null })[]>;
   getAllUsers(): Promise<(User & { department: Department | null; function: Function | null; employmentType: EmploymentType | null })[]>;
 
   // Time record methods
@@ -44,7 +41,7 @@ export interface IStorage {
   createTimeRecord(record: InsertTimeRecord): Promise<TimeRecord>;
   updateTimeRecord(id: number, record: Partial<InsertTimeRecord>): Promise<TimeRecord | undefined>;
   getTimeRecordsForUser(userId: number, month?: string): Promise<TimeRecord[]>;
-  getAllTimeRecordsForDate(date: string): Promise<(TimeRecord & { user: User })[]>;
+  getAllTimeRecordsForDate(date: string, departmentId: number): Promise<(TimeRecord & { user: User })[]>;
 
   // Justification methods
   createJustification(justification: InsertJustification): Promise<Justification>;
@@ -194,12 +191,16 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async getAllEmployees(): Promise<(User & { department: Department | null })[]> {
+  async getAllEmployees(departmentId: number): Promise<(User & { department: Department | null })[]> {
     return await db
       .select()
       .from(users)
       .leftJoin(departments, eq(users.departmentId, departments.id))
-      .where(and(eq(users.status, "active"), eq(users.role, "employee")))
+      .where(and(
+        eq(users.status, "active"), 
+        eq(users.role, "employee"),
+        eq(users.departmentId, departmentId) // Filtro por departamento adicionado
+      ))
       .then(results => results.map(result => ({
         ...result.users,
         department: result.departments
@@ -266,13 +267,15 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(timeRecords.date));
   }
-
-  async getAllTimeRecordsForDate(date: string): Promise<(TimeRecord & { user: User })[]> {
+  async getAllTimeRecordsForDate(date: string, departmentId: number): Promise<(TimeRecord & { user: User })[]> {
     return await db
       .select()
       .from(timeRecords)
       .innerJoin(users, eq(timeRecords.userId, users.id))
-      .where(eq(timeRecords.date, date))
+      .where(and(
+        eq(timeRecords.date, date),
+        eq(users.departmentId, departmentId) // Filtro por departamento adicionado
+      ))
       .then(results => results.map(result => ({
         ...result.time_records,
         user: result.users
@@ -422,8 +425,11 @@ export class DatabaseStorage implements IStorage {
 
   // Password reset methods
   async getPasswordResetRequest(id: number): Promise<PasswordResetRequest | undefined> {
-    const [request] = await db.select().from(passwordResetRequests).where(eq(passwordResetRequests.id, id));
-    return request || undefined;
+    const [request] = await db
+      .select()
+      .from(passwordResetRequests)
+      .where(eq(passwordResetRequests.id, id));
+    return request;
   }
 
   async createPasswordResetRequest(insertRequest: InsertPasswordResetRequest): Promise<PasswordResetRequest> {

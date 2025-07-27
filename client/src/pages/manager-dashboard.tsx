@@ -57,16 +57,11 @@ export default function ManagerDashboard() {
     const totalEmployees = employees.length;
     const presentToday = todayRecords.filter((record: any) => record.entry1).length;
     const pendingJustificationsCount = pendingJustifications.length;
-    
-    // Calculate overtime hours for current month
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const overtimeHours = 0; // This would be calculated from hour bank data
 
     return {
       totalEmployees,
       presentToday,
       pendingJustifications: pendingJustificationsCount,
-      overtimeHours: `${overtimeHours}h`,
     };
   };
 
@@ -150,7 +145,7 @@ export default function ManagerDashboard() {
           </Card>
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card>
               <CardContent className="p-5">
                 <div className="flex items-center">
@@ -193,22 +188,6 @@ export default function ManagerDashboard() {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Justificativas Pendentes</dt>
                       <dd className="text-lg font-medium text-gray-900">{stats.pendingJustifications}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <Clock className="text-gray-600 text-2xl" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Horas Extras Mês</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overtimeHours}</dd>
                     </dl>
                   </div>
                 </div>

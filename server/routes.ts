@@ -154,30 +154,34 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/admin/password-reset-requests/:id/resolve", requireAdmin, async (req, res, next) => {
+  app.post("/api/admin/password-reset/:requestId/resolve", requireAdmin, async (req, res, next) => {
     try {
-        const requestId = Number(req.params.id);
-        const adminId = req.user.id;
+      const requestId = parseInt(req.params.requestId);
+      const adminId = req.user.id;
+      const { newPassword } = req.body;
 
-        const request = await storage.getPasswordResetRequest(requestId);
-        if (!request || request.status !== 'pending') {
-            return res.status(404).json({ message: "Solicitação não encontrada ou já resolvida." });
-        }
+      if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+        return res.status(400).json({ message: "A nova senha deve ter pelo menos 6 caracteres." });
+      }
 
-        const userToReset = await storage.getUserByCpf(request.cpf);
-        if (!userToReset) {
-            return res.status(404).json({ message: "Usuário associado à solicitação não encontrado." });
-        }
+      // 1. Busca a solicitação para garantir que ela existe e está pendente
+      const request = await storage.getPasswordResetRequest(requestId);
+      if (!request || request.status !== 'pending') {
+          return res.status(404).json({ message: "Solicitação não encontrada ou já resolvida." });
+      }
 
-        const tempPassword = userToReset.cpf.replace(/\D/g, '').substring(0, 6);
-        const hashedPassword = await hashPassword(tempPassword);
+      // 2. Criptografa a nova senha
+      const hashedPassword = await hashPassword(newPassword);
 
-        await storage.updateUser(userToReset.id, { password: hashedPassword });
-        await storage.resolvePasswordResetRequest(requestId, adminId);
+      // 3. Atualiza a senha do usuário
+      await storage.updateUser(request.userId, { password: hashedPassword });
+      
+      // 4. Marca a solicitação como resolvida
+      await storage.resolvePasswordResetRequest(requestId, adminId);
 
-        res.json({ tempPassword });
+      res.status(200).json({ message: "Senha redefinida com sucesso." });
     } catch (error) {
-        next(error);
+      next(error);
     }
   });
 
@@ -321,7 +325,11 @@ export function registerRoutes(app: Express): Server {
   // Manager endpoints
   app.get("/api/manager/employees", requireManager, async (req, res, next) => {
     try {
-      const employees = await storage.getAllEmployees();
+      const managerDepartmentId = req.user.departmentId;
+      if (!managerDepartmentId) {
+        return res.status(400).json({ message: "O gestor não está associado a um departamento." });
+      }
+      const employees = await storage.getAllEmployees(managerDepartmentId);
       res.json(employees);
     } catch (error) {
       next(error);
@@ -331,16 +339,30 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/manager/time-records/:date", requireManager, async (req, res, next) => {
     try {
       const date = req.params.date;
-      const records = await storage.getAllTimeRecordsForDate(date);
+      const managerDepartmentId = req.user.departmentId;
+      if (!managerDepartmentId) {
+        return res.status(400).json({ message: "O gestor não está associado a um departamento." });
+      }
+      const records = await storage.getAllTimeRecordsForDate(date, managerDepartmentId);
       res.json(records);
     } catch (error) {
       next(error);
     }
   });
-
   app.get("/api/manager/justifications/pending", requireManager, async (req, res, next) => {
     try {
-      const justifications = await storage.getPendingJustifications();
+      // 1. Obter o ID do departamento do gestor logado.
+      const managerDepartmentId = req.user.departmentId;
+
+      // 2. Validar se o gestor possui um departamento associado.
+      if (!managerDepartmentId) {
+        return res.status(400).json({ 
+          message: "O gestor não está associado a um departamento." 
+        });
+      }
+
+      // 3. Chamar a função de busca passando o ID do departamento para o filtro.
+      const justifications = await storage.getPendingJustifications(managerDepartmentId);
       res.json(justifications);
     } catch (error) {
       next(error);
@@ -369,27 +391,25 @@ export function registerRoutes(app: Express): Server {
       const id = parseInt(req.params.id);
       const updateData = req.body;
       
-      // Recalculate total hours if times are updated
-      if (updateData.entry1 || updateData.exit1 || updateData.entry2 || updateData.exit2) {
-        const record = await storage.updateTimeRecord(id, updateData);
-        if (record && record.entry1 && record.exit1 && record.entry2 && record.exit2) {
-          const entry1Minutes = parseInt(record.entry1.split(':')[0]) * 60 + parseInt(record.entry1.split(':')[1]);
-          const exit1Minutes = parseInt(record.exit1.split(':')[0]) * 60 + parseInt(record.exit1.split(':')[1]);
-          const entry2Minutes = parseInt(record.entry2.split(':')[0]) * 60 + parseInt(record.entry2.split(':')[1]);
-          const exit2Minutes = parseInt(record.exit2.split(':')[0]) * 60 + parseInt(record.exit2.split(':')[1]);
-          
-          const totalMinutes = (exit1Minutes - entry1Minutes) + (exit2Minutes - entry2Minutes);
-          const totalHours = totalMinutes / 60;
-          
-          await storage.updateTimeRecord(id, { totalHours: totalHours.toFixed(2) });
-        if (error instanceof z.ZodError) {
-            return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
-        }
-      }
-      
-      const timeRecord = await storage.updateTimeRecord(id, updateData);
+      // Atualiza o registro com os dados enviados pelo gestor
+      let timeRecord = await storage.updateTimeRecord(id, updateData);
+
       if (!timeRecord) {
         return res.status(404).json({ message: "Time record not found" });
+      }
+      
+      // Se o registro agora tiver todos os 4 pontos, recalcula as horas totais
+      if (timeRecord.entry1 && timeRecord.exit1 && timeRecord.entry2 && timeRecord.exit2) {
+        const entry1Minutes = parseInt(timeRecord.entry1.split(':')[0]) * 60 + parseInt(timeRecord.entry1.split(':')[1]);
+        const exit1Minutes = parseInt(timeRecord.exit1.split(':')[0]) * 60 + parseInt(timeRecord.exit1.split(':')[1]);
+        const entry2Minutes = parseInt(timeRecord.entry2.split(':')[0]) * 60 + parseInt(timeRecord.entry2.split(':')[1]);
+        const exit2Minutes = parseInt(timeRecord.exit2.split(':')[0]) * 60 + parseInt(timeRecord.exit2.split(':')[1]);
+        
+        const totalMinutes = (exit1Minutes - entry1Minutes) + (exit2Minutes - entry2Minutes);
+        const totalHours = totalMinutes / 60;
+        
+        // Atualiza o registro novamente, desta vez com as horas totais calculadas
+        timeRecord = await storage.updateTimeRecord(id, { totalHours: totalHours.toFixed(2) });
       }
       
       res.json(timeRecord);
