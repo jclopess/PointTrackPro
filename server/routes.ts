@@ -39,19 +39,75 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.put("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
+  // Admin routes for users creation
+  app.post("/api/admin/users", requireAdmin, async (req, res, next) => {
     try {
-      const { password, ...userData } = req.body;
-      if (password) {
-        userData.password = await hashPassword(password);
-      }
-      const updatedUser = await storage.updateUser(Number(req.params.id), userData);
-      res.json(updatedUser);
-    } catch (error) {
-      next(error);
-    }
+        const { password, ...userDataFromRequest } = req.body;
+
+        const validatedData = insertUserSchema.omit({ password: true }).parse(userDataFromRequest);
+
+        // Verificação de CPF duplicados antes de criar
+        const existingUserByCpf = await storage.getUserByCpf(validatedData.cpf);
+        if (existingUserByCpf) {
+          return res.status(409).json({ message: `O CPF ${validatedData.cpf} já está em uso.` });
+        }
+        const existingUserByUsername = await storage.getUserByUsername(validatedData.username);
+        if (existingUserByUsername) {
+          return res.status(409).json({ message: `O nome de usuário "${validatedData.username}" já está em uso.` });
+        }
+
+        // Gera uma senha temporária (ex: os 6 primeiros dígitos do CPF)
+        const tempPassword = validatedData.cpf.replace(/\D/g, '').substring(0, 6);
+        const hashedPassword = await hashPassword(tempPassword);
+
+        const newUser = await storage.createUser({
+            ...validatedData,
+            password: hashedPassword,
+        });
+        
+        // Retorna o novo usuário e a senha temporária para o admin
+        res.status(201).json({ user: newUser, tempPassword });
+
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+              return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
+          }
+          next(error);
+        }
   });
 
+  // Admin routes for users update
+  app.put("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
+    try {
+        const id = parseInt(req.params.id);
+        const validatedData = insertUserSchema.omit({ password: true }).partial().parse(req.body);
+
+        // Verificação de duplicados antes de atualizar
+        if (validatedData.cpf) {
+            const existingUser = await storage.getUserByCpf(validatedData.cpf);
+            if (existingUser && existingUser.id !== id) {
+                return res.status(409).json({ message: `O CPF ${validatedData.cpf} já pertence a outro usuário.` });
+            }
+        }
+        if (validatedData.username) {
+            const existingUser = await storage.getUserByUsername(validatedData.username);
+            if (existingUser && existingUser.id !== id) {
+                return res.status(409).json({ message: `O nome de usuário "${validatedData.username}" já pertence a outro usuário.` });
+            }
+        }
+
+        const updatedUser = await storage.updateUser(id, validatedData);
+        if (!updatedUser) {
+            return res.status(404).json({ message: "Usuário não encontrado" });
+        }
+        res.json(updatedUser);
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
+        }
+        next(error);
+    }
+  });
 
   // Admin routes for departments
   app.get("/api/admin/departments", requireAdmin, async (req, res) => {
@@ -259,37 +315,6 @@ export function registerRoutes(app: Express): Server {
       res.json(timeRecord);
     } catch (error) {
       next(error);
-    }
-  });
-
-  // Rota de criação de usuário atualizada
-  app.post("/api/admin/users", requireAdmin, async (req, res, next) => {
-    try {
-        const { password, ...userDataFromRequest } = req.body;
-
-        const validatedData = insertUserSchema.omit({ password: true }).parse(userDataFromRequest);
-
-        // Gera uma senha temporária (ex: os 6 primeiros dígitos do CPF)
-        const tempPassword = validatedData.cpf.replace(/\D/g, '').substring(0, 6);
-        const hashedPassword = await hashPassword(tempPassword);
-
-        const newUser = await storage.createUser({
-            ...validatedData,
-            password: hashedPassword,
-        });
-        
-        // Retorna o novo usuário e a senha temporária para o admin
-        res.status(201).json({ user: newUser, tempPassword });
-
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
-        }
-        // Trata erro de CPF duplicado do banco de dados
-        if (error instanceof Error && 'code' in error && error.code === '23505') {
-            return res.status(409).json({ message: "O CPF ou nome de usuário informado já está em uso." });
-        }
-        next(error);
     }
   });
 
