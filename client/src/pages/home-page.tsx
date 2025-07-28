@@ -8,7 +8,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TimeRegistrationGrid } from "@/components/time-registration-grid";
 import { JustificationModal } from "@/components/justification-modal";
-import { useState } from "react";
+import { ChangePasswordModal } from "@/components/change-password-modal";
+import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 
@@ -16,15 +17,25 @@ export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [showJustificationModal, setShowJustificationModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
+  useEffect(() => {
+    if (user?.mustChangePassword) {
+      setShowChangePasswordModal(true);
+    } else {
+      setShowChangePasswordModal(false);
+    }
+  }, [user]);
+
   const { data: todayRecord, refetch: refetchToday } = useQuery({
     queryKey: ["/api/time-records/today", user?.id],
     queryFn: () => apiRequest("GET", "/api/time-records/today").then(res => res.json()),
-    enabled: user?.role === "employee", // Only fetch for employees
+    enabled: user?.role === "employee" && !user?.mustChangePassword, // Only fetch for employees
   });
 
   const { data: timeRecords = [] } = useQuery({
@@ -308,9 +319,14 @@ export default function HomePage() {
         </div>
       </div>
 
-      <JustificationModal
+      <JustificationModal // Modal for creating justifications
         open={showJustificationModal}
         onOpenChange={setShowJustificationModal}
+      />
+      <ChangePasswordModal //Modal for changing password
+        open={showChangePasswordModal}
+        onSuccess={() => {
+        }}
       />
     </div>
   );

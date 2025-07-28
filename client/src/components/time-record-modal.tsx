@@ -21,7 +21,7 @@ export function TimeRecordModal({ record, open, onOpenChange, onSuccess }: TimeR
     entry1: "",
     exit1: "",
     entry2: "",
-    entry2: "",
+    exit2: "",
   });
 
   useEffect(() => {

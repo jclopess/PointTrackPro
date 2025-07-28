@@ -55,6 +55,7 @@ export const users = pgTable("users", {
   admissionDate: date("admission_date"),
   dismissalDate: date("dismissal_date"),
   status: text("status").notNull().default("active"), // "active", "blocked", "inactive"
+  mustChangePassword: boolean("must_change_password").default(true).notNull(),
   dailyWorkHours: decimal("daily_work_hours", { precision: 4, scale: 2 }).notNull().default("8.00"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

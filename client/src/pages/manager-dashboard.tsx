@@ -11,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { EmployeeTable } from "@/components/employee-table";
 import { ReportModal } from "@/components/report-modal";
 import { TimeRecordModal } from "@/components/time-record-modal";
-import { useState } from "react";
+import { ChangePasswordModal } from "@/components/change-password-modal";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { type TimeRecord } from "@shared/schema";
 
@@ -24,8 +25,18 @@ export default function ManagerDashboard() {
   const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [editingRecord, setEditingRecord] = useState<TimeRecord | null>(null);
   const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);  
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const today = new Date().toISOString().split('T')[0];
+
+  // Verifica se o usuário precisa mudar a senha
+  useEffect(() => {
+    if (user?.mustChangePassword) {
+      setShowChangePasswordModal(true);
+    } else {
+      setShowChangePasswordModal(false);
+    }
+  }, [user]);
 
   // A query de registros agora é dinâmica com base na data selecionada
   const { data: recordsByDate = [], refetch: refetchRecordsByDate } = useQuery({
@@ -37,20 +48,20 @@ export default function ManagerDashboard() {
   const { data: employees = [] } = useQuery({
     queryKey: ["/api/manager/employees", user?.id],
     queryFn: ({ queryKey }) => apiRequest("GET", queryKey[0] as string).then(res => res.json()),
-    enabled: !!user,
+    enabled: !!user && !user?.mustChangePassword,
   });
 
   //Talvez seja necessário comentar para evitar conflitos com o novo endpoint
   const { data: todayRecords = [] } = useQuery({
     queryKey: ["/api/manager/time-records", today, user?.id],
     queryFn: ({ queryKey }) => apiRequest("GET", `${queryKey[0]}/${queryKey[1]}`).then(res => res.json()),
-    enabled: !!user,
+    enabled: !!user && !user?.mustChangePassword,
   });
 
   const { data: pendingJustifications = [], refetch: refetchJustifications } = useQuery({
     queryKey: ["/api/manager/justifications/pending", user?.id],
     queryFn: ({ queryKey }) => apiRequest("GET", queryKey[0] as string).then(res => res.json()),
-    enabled: !!user,
+    enabled: !!user && !user?.mustChangePassword,
   });
 
   const approveJustificationMutation = useMutation({
@@ -311,16 +322,21 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      <ReportModal
+      <ReportModal // Modal for generating reports
         open={showReportModal}
         onOpenChange={setShowReportModal}
         employees={employees}
       />
-        <TimeRecordModal
+        <TimeRecordModal // Modal for creating or editing time records
         record={editingRecord}
         open={showTimeRecordModal}
         onOpenChange={setShowTimeRecordModal}
         onSuccess={refetchRecordsByDate}
+      />
+      <ChangePasswordModal //Modal for changing password
+        open={showChangePasswordModal}
+        onSuccess={() => {
+        }}
       />
     </div>
   );

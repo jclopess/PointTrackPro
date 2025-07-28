@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth, hashPassword } from "./auth"; // Importa a função hashPassword
+import { setupAuth, hashPassword } from "./auth";
 import { storage } from "./storage";
 import { generateMonthlyReportPDF } from "./pdf-generator";
 import { insertTimeRecordSchema, insertJustificationSchema, insertDepartmentSchema, insertUserSchema, insertFunctionSchema, insertEmploymentTypeSchema } from "@shared/schema";
@@ -31,7 +31,7 @@ export function registerRoutes(app: Express): Server {
     next();
   };
 
-  // Admin routes for users
+  // Routes for users creation
   app.get("/api/admin/users", requireAdmin, async (req, res, next) => {
     try {
       const users = await storage.getAllUsers();
@@ -41,7 +41,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Admin routes for users creation
   app.post("/api/admin/users", requireAdmin, async (req, res, next) => {
     try {
         const { password, ...userDataFromRequest } = req.body;
@@ -58,7 +57,7 @@ export function registerRoutes(app: Express): Server {
           return res.status(409).json({ message: `O nome de usuário "${validatedData.username}" já está em uso.` });
         }
 
-        // Gera uma senha temporária (ex: os 6 primeiros dígitos do CPF)
+        // Gera uma senha temporária (os 6 primeiros dígitos do CPF)
         const tempPassword = validatedData.cpf.replace(/\D/g, '').substring(0, 6);
         const hashedPassword = await hashPassword(tempPassword);
 
@@ -78,7 +77,7 @@ export function registerRoutes(app: Express): Server {
         }
   });
 
-  // Admin routes for users update
+  // Routes for users update
   app.put("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
     try {
         const id = parseInt(req.params.id);
@@ -111,7 +110,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Admin routes for departments
+  // Routes for departments
   app.get("/api/admin/departments", requireAdmin, async (req, res) => {
     const showInactive = req.query.inactive === 'true';
     res.json(await storage.getAllDepartments(showInactive));
@@ -145,8 +144,17 @@ export function registerRoutes(app: Express): Server {
     res.json(await storage.toggleDepartmentStatus(id, status));
   });
 
+  app.get("/api/departments", async (req, res) => {
+    try {
+      const departments = await storage.getAllDepartments();
+      res.json(departments);
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      res.status(500).send("Internal server error");
+    }
+  });
 
-  // Admin routes for functions
+  // Routes for functions
   app.get("/api/admin/functions", requireAdmin, async (req, res) => {
     const showInactive = req.query.inactive === 'true';
     res.json(await storage.getAllFunctions(showInactive));
@@ -180,7 +188,7 @@ export function registerRoutes(app: Express): Server {
     res.json(await storage.toggleFunctionStatus(id, status));
   });
 
-  // Admin routes for employment types
+  // Routes for employment types
   app.get("/api/admin/employment-types", requireAdmin, async (req, res) => {
     const showInactive = req.query.inactive === 'true';
     res.json(await storage.getAllEmploymentTypes(showInactive));
@@ -214,7 +222,7 @@ export function registerRoutes(app: Express): Server {
     res.json(await storage.toggleEmploymentTypeStatus(id, status));
   });
 
-  // Admin routes for password reset
+  // Routes for password change/reset
   app.get("/api/admin/password-reset-requests", requireAdmin, async (req, res, next) => {
     try {
       const requests = await storage.getPendingPasswordResetRequests();
@@ -234,20 +242,13 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ message: "A nova senha deve ter pelo menos 6 caracteres." });
       }
 
-      // 1. Busca a solicitação para garantir que ela existe e está pendente
       const request = await storage.getPasswordResetRequest(requestId);
       if (!request || request.status !== 'pending') {
-          return res.status(404).json({ message: "Solicitação não encontrada ou já resolvida." });
+          return res.status(404).json({ message: "Solicitação não encontrada ou já resolvida." }); // 1. Busca a solicitação para garantir que ela existe e está pendente
       }
-
-      // 2. Criptografa a nova senha
-      const hashedPassword = await hashPassword(newPassword);
-
-      // 3. Atualiza a senha do usuário
-      await storage.updateUser(request.userId, { password: hashedPassword });
-      
-      // 4. Marca a solicitação como resolvida
-      await storage.resolvePasswordResetRequest(requestId, adminId);
+      const hashedPassword = await hashPassword(newPassword); // 2. Criptografa a nova senha
+      await storage.updateUser(request.userId, { password: hashedPassword }); // 3. Atualiza a senha do usuário
+      await storage.resolvePasswordResetRequest(requestId, adminId); // 4. Marca a solicitação como resolvida
 
       res.status(200).json({ message: "Senha redefinida com sucesso." });
     } catch (error) {
@@ -255,17 +256,30 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/departments", async (req, res) => {
+app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
     try {
-      const departments = await storage.getAllDepartments();
-      res.json(departments);
+      const userId = req.user.id;
+      const { newPassword } = req.body;
+
+      if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+        return res.status(400).json({ message: "A nova senha deve ter pelo menos 6 caracteres." });
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+
+      // Atualiza a senha e marca que a alteração não é mais necessária
+      const updatedUser = await storage.updateUser(userId, { 
+        password: hashedPassword,
+        mustChangePassword: false 
+      });
+
+      res.status(200).json(updatedUser);
     } catch (error) {
-      console.error("Error fetching departments:", error);
-      res.status(500).send("Internal server error");
+      next(error);
     }
   });
 
-  // Routes for Marcações
+  // Routes for Time Records
   app.get("/api/time-records/today", requireAuth, async (req, res, next) => {
     try {
       const userId = req.user.id;
