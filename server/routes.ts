@@ -387,11 +387,14 @@ export function registerRoutes(app: Express): Server {
       }
 
       // 3. Chamar a função de busca passando o ID do departamento para o filtro.
-      const justifications = await storage.getPendingJustifications(managerDepartmentId);
+      const justifications = await storage.getPendingJustifications(
+        req.user.role === 'admin' ? undefined : managerDepartmentId
+      );
       res.json(justifications);
     } catch (error) {
       next(error);
     }
+
   });
 
 

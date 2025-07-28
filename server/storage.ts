@@ -282,6 +282,7 @@ export class DatabaseStorage implements IStorage {
       })));
   }
 
+  // Justifications Methods
   async createJustification(justification: InsertJustification): Promise<Justification> {
     const [newJustification] = await db
       .insert(justifications)
@@ -298,7 +299,6 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(justifications.createdAt));
   }
 
-  // MÉTODO ATUALIZADO
   async getPendingJustifications(departmentId?: number): Promise<(Justification & { user: User })[]> {
     let query = db
       .select()
@@ -308,7 +308,6 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(justifications.createdAt))
       .$dynamic();
       
-    // Se um departmentId for fornecido, adiciona o filtro
     if (departmentId) {
       query = query.where(eq(users.departmentId, departmentId));
     }

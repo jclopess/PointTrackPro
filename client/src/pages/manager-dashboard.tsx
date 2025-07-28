@@ -23,22 +23,28 @@ export default function ManagerDashboard() {
   const today = new Date().toISOString().split('T')[0];
 
   const { data: employees = [] } = useQuery({
-    queryKey: ["/api/manager/employees"],
+    queryKey: ["/api/manager/employees", user?.id],
+    queryFn: ({ queryKey }) => apiRequest("GET", queryKey[0] as string).then(res => res.json()),
+    enabled: !!user,
   });
 
   const { data: todayRecords = [] } = useQuery({
-    queryKey: ["/api/manager/time-records", today],
+    queryKey: ["/api/manager/time-records", today, user?.id],
+    queryFn: ({ queryKey }) => apiRequest("GET", `${queryKey[0]}/${queryKey[1]}`).then(res => res.json()),
+    enabled: !!user,
   });
 
-  const { data: pendingJustifications = [] } = useQuery({
-    queryKey: ["/api/manager/justifications/pending"],
+  const { data: pendingJustifications = [], refetch: refetchJustifications } = useQuery({
+    queryKey: ["/api/manager/justifications/pending", user?.id],
+    queryFn: ({ queryKey }) => apiRequest("GET", queryKey[0] as string).then(res => res.json()),
+    enabled: !!user,
   });
 
   const approveJustificationMutation = useMutation({
     mutationFn: ({ id, approved }: { id: number; approved: boolean }) =>
       apiRequest("POST", `/api/manager/justifications/${id}/approve`, { approved }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/justifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/justifications", user?.id] });
       toast({
         title: "Justificativa processada",
         description: "A justificativa foi processada com sucesso.",
