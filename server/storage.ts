@@ -223,6 +223,15 @@ export class DatabaseStorage {
     }));
   }
 
+  // Time record methods
+  async getTimeRecordById(id: number): Promise<TimeRecord | undefined> {
+    const [record] = await db
+      .select()
+      .from(timeRecords)
+      .where(eq(timeRecords.id, id));
+    return record;
+  }
+
   async getTimeRecord(userId: number, date: string): Promise<TimeRecord | undefined> {
     const [record] = await db
       .select()

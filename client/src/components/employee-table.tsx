@@ -2,14 +2,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Edit, Eye } from "lucide-react";
+import { Edit } from "lucide-react";
+import { type TimeRecord } from "@shared/schema";
 
 interface EmployeeTableProps {
   employees: any[];
   timeRecords: any[];
+  onEditRecord: (record: TimeRecord) => void; // Prop para o evento de clique
 }
 
-export function EmployeeTable({ employees, timeRecords }: EmployeeTableProps) {
+export function EmployeeTable({ employees, timeRecords, onEditRecord }: EmployeeTableProps) {
   const getEmployeeRecord = (employeeId: number) => {
     return timeRecords.find((record) => record.userId === employeeId);
   };
@@ -18,11 +20,9 @@ export function EmployeeTable({ employees, timeRecords }: EmployeeTableProps) {
     if (!record || !record.entry1) {
       return <Badge variant="secondary">Ausente</Badge>;
     }
-    
     if (record.entry1 && record.exit1 && record.entry2 && record.exit2) {
       return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Completo</Badge>;
     }
-    
     return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Presente</Badge>;
   };
 
@@ -46,7 +46,7 @@ export function EmployeeTable({ employees, timeRecords }: EmployeeTableProps) {
             <TableHead>Entrada 2</TableHead>
             <TableHead>Saída 2</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Ações</TableHead>
+            <TableHead className="text-right">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -69,28 +69,17 @@ export function EmployeeTable({ employees, timeRecords }: EmployeeTableProps) {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="text-sm text-gray-900">
-                  {record?.entry1 || "--:--"}
-                </TableCell>
-                <TableCell className="text-sm text-gray-900">
-                  {record?.exit1 || "--:--"}
-                </TableCell>
-                <TableCell className="text-sm text-gray-900">
-                  {record?.entry2 || "--:--"}
-                </TableCell>
-                <TableCell className="text-sm text-gray-900">
-                  {record?.exit2 || "--:--"}
-                </TableCell>
+                <TableCell className="text-sm text-gray-900">{record?.entry1 || "--:--"}</TableCell>
+                <TableCell className="text-sm text-gray-900">{record?.exit1 || "--:--"}</TableCell>
+                <TableCell className="text-sm text-gray-900">{record?.entry2 || "--:--"}</TableCell>
+                <TableCell className="text-sm text-gray-900">{record?.exit2 || "--:--"}</TableCell>
                 <TableCell>{getStatusBadge(record)}</TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button variant="ghost" size="sm">
+                <TableCell className="text-right">
+                  {record && (
+                    <Button variant="ghost" size="sm" onClick={() => onEditRecord(record)}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  )}
                 </TableCell>
               </TableRow>
             );

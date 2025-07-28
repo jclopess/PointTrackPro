@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { generateMonthlyReportPDF } from "./pdf-generator";
 import { insertTimeRecordSchema, insertJustificationSchema, insertDepartmentSchema, insertUserSchema, insertFunctionSchema, insertEmploymentTypeSchema } from "@shared/schema";
 import { z } from "zod";
+import { isBefore, startOfMonth, subMonths } from 'date-fns';
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -433,31 +434,37 @@ export function registerRoutes(app: Express): Server {
 
   app.put("/api/manager/time-records/:id", requireManager, async (req, res, next) => {
     try {
-      const id = parseInt(req.params.id);
-      const updateData = req.body;
-      
-      // Atualiza o registro com os dados enviados pelo gestor
-      let timeRecord = await storage.updateTimeRecord(id, updateData);
+      const recordId = parseInt(req.params.id);
+      const { entry1, exit1, entry2, exit2 } = req.body;
+  
+      // 1. Buscar o registro original para validação
+      const originalRecord = await storage.getTimeRecordById(recordId);
+      if (!originalRecord) {
+        return res.status(404).json({ message: "Registro de ponto não encontrado." });
+      }
 
-      if (!timeRecord) {
-        return res.status(404).json({ message: "Time record not found" });
+      // --- REGRAS DE NEGÓCIO ---
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const recordDate = new Date(`${originalRecord.date}T12:00:00Z`);
+
+      // Regra 1: Proibido ajustar a marcação do dia atual
+      if (recordDate.getTime() === today.getTime()) {
+        return res.status(403).json({ message: "Não é permitido ajustar registros do dia atual." });
       }
-      
-      // Se o registro agora tiver todos os 4 pontos, recalcula as horas totais
-      if (timeRecord.entry1 && timeRecord.exit1 && timeRecord.entry2 && timeRecord.exit2) {
-        const entry1Minutes = parseInt(timeRecord.entry1.split(':')[0]) * 60 + parseInt(timeRecord.entry1.split(':')[1]);
-        const exit1Minutes = parseInt(timeRecord.exit1.split(':')[0]) * 60 + parseInt(timeRecord.exit1.split(':')[1]);
-        const entry2Minutes = parseInt(timeRecord.entry2.split(':')[0]) * 60 + parseInt(timeRecord.entry2.split(':')[1]);
-        const exit2Minutes = parseInt(timeRecord.exit2.split(':')[0]) * 60 + parseInt(timeRecord.exit2.split(':')[1]);
-        
-        const totalMinutes = (exit1Minutes - entry1Minutes) + (exit2Minutes - entry2Minutes);
-        const totalHours = totalMinutes / 60;
-        
-        // Atualiza o registro novamente, desta vez com as horas totais calculadas
-        timeRecord = await storage.updateTimeRecord(id, { totalHours: totalHours.toFixed(2) });
+
+      // Regra 2: Limite de período para ajuste (mês anterior)
+      const firstDayOfLastMonth = startOfMonth(subMonths(today, 1));
+      if (isBefore(recordDate, firstDayOfLastMonth)) {
+        return res.status(403).json({ message: "Não é permitido ajustar registros de meses anteriores ao mês passado." });
       }
-      
-      res.json(timeRecord);
+
+      // 2. Atualizar o registro no banco
+      const updatedRecord = await storage.updateTimeRecord(recordId, {
+        entry1, exit1, entry2, exit2, isAdjusted: true,
+      });
+
+      res.json(updatedRecord);
     } catch (error) {
       next(error);
     }

@@ -68,6 +68,7 @@ export const timeRecords = pgTable("time_records", {
   entry2: text("entry2"),
   exit2: text("exit2"),
   totalHours: decimal("total_hours", { precision: 4, scale: 2 }),
+  isAdjusted: boolean("is_adjusted").default(false).notNull(), // Indicates if the record was adjusted
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

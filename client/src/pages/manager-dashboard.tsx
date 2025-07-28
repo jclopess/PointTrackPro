@@ -5,22 +5,34 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, Users, LogOut, FileText, TriangleAlert, CheckCircle, XCircle, Eye, Edit, ArrowLeft } from "lucide-react";
+import { Clock, Users, LogOut, FileText, TriangleAlert, CheckCircle, XCircle, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmployeeTable } from "@/components/employee-table";
 import { ReportModal } from "@/components/report-modal";
+import { TimeRecordModal } from "@/components/time-record-modal";
 import { useState } from "react";
 import { Link } from "wouter";
+import { type TimeRecord } from "@shared/schema";
 
 export default function ManagerDashboard() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  
+
+  // Estados para o modal de registro de ponto
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedEmployee, setSelectedEmployee] = useState("all");
+  const [editingRecord, setEditingRecord] = useState<TimeRecord | null>(null);
+  const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);  
   const today = new Date().toISOString().split('T')[0];
+
+  // A query de registros agora é dinâmica com base na data selecionada
+  const { data: recordsByDate = [], refetch: refetchRecordsByDate } = useQuery({
+    queryKey: ["/api/manager/time-records", selectedDate, user?.id],
+    queryFn: ({ queryKey }) => apiRequest("GET", `${queryKey[0]}/${queryKey[1]}`).then(res => res.json()),
+    enabled: !!user,
+  });
 
   const { data: employees = [] } = useQuery({
     queryKey: ["/api/manager/employees", user?.id],
@@ -28,6 +40,7 @@ export default function ManagerDashboard() {
     enabled: !!user,
   });
 
+  //Talvez seja necessário comentar para evitar conflitos com o novo endpoint
   const { data: todayRecords = [] } = useQuery({
     queryKey: ["/api/manager/time-records", today, user?.id],
     queryFn: ({ queryKey }) => apiRequest("GET", `${queryKey[0]}/${queryKey[1]}`).then(res => res.json()),
@@ -73,19 +86,14 @@ export default function ManagerDashboard() {
 
   const stats = getStats();
 
+  const handleEditRecord = (record: TimeRecord) => {
+    setEditingRecord(record);
+    setShowTimeRecordModal(true);
+  };
+
   const filteredEmployees = employees.filter((employee: any) => {
-    const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         employee.username.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (statusFilter === "all") return matchesSearch;
-    
-    const todayRecord = todayRecords.find((record: any) => record.userId === employee.id);
-    const isPresent = todayRecord?.entry1;
-    
-    if (statusFilter === "present") return matchesSearch && isPresent;
-    if (statusFilter === "absent") return matchesSearch && !isPresent;
-    
-    return matchesSearch;
+    if (selectedEmployee === "all") return true;
+    return employee.id === parseInt(selectedEmployee);
   });
 
   return (
@@ -202,26 +210,31 @@ export default function ManagerDashboard() {
           </div>
 
           {/* Employee Records Table */}
-          <Card>
+ <Card>
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>Registros dos Funcionários</CardTitle>
                 <div className="mt-3 sm:mt-0 sm:ml-4">
                   <div className="flex space-x-3">
+                    {/* FILTRO DE DATA */}
                     <Input
-                      placeholder="Buscar funcionário..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
                       className="w-full sm:w-auto"
                     />
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-full sm:w-auto">
+                    {/* FILTRO DE FUNCIONÁRIO (SELECT) */}
+                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                      <SelectTrigger className="w-full sm:w-[200px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todos os status</SelectItem>
-                        <SelectItem value="present">Presente</SelectItem>
-                        <SelectItem value="absent">Ausente</SelectItem>
+                        <SelectItem value="all">Todos os funcionários</SelectItem>
+                        {employees.map((employee: any) => (
+                          <SelectItem key={employee.id} value={employee.id.toString()}>
+                            {employee.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -231,7 +244,8 @@ export default function ManagerDashboard() {
             <CardContent>
               <EmployeeTable 
                 employees={filteredEmployees} 
-                timeRecords={todayRecords}
+                timeRecords={recordsByDate}
+                onEditRecord={handleEditRecord} // Passa a função para a tabela
               />
             </CardContent>
           </Card>
@@ -301,6 +315,12 @@ export default function ManagerDashboard() {
         open={showReportModal}
         onOpenChange={setShowReportModal}
         employees={employees}
+      />
+        <TimeRecordModal
+        record={editingRecord}
+        open={showTimeRecordModal}
+        onOpenChange={setShowTimeRecordModal}
+        onSuccess={refetchRecordsByDate}
       />
     </div>
   );
