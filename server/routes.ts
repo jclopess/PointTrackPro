@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { generateMonthlyReportPDF } from "./pdf-generator";
 import { insertTimeRecordSchema, insertJustificationSchema, insertDepartmentSchema, insertUserSchema, insertFunctionSchema, insertEmploymentTypeSchema } from "@shared/schema";
 import { z } from "zod";
-import { isBefore, startOfMonth, subMonths } from 'date-fns';
+import { format, startOfMonth, subMonths, addDays } from 'date-fns';
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -457,7 +457,6 @@ app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
         return res.status(404).json({ message: "Registro de ponto não encontrado." });
       }
 
-      // --- REGRAS DE NEGÓCIO ---
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const recordDate = new Date(`${originalRecord.date}T12:00:00Z`);
@@ -496,33 +495,41 @@ app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
   });
 
   // Gera relatório mensal
+  const handleReportGeneration = async (userId: number, month: string) => {
+    const referenceDate = new Date(`${month}-02T12:00:00Z`); // Usamos o dia 2 para evitar problemas com fuso horário
+    const startDate = format(addDays(startOfMonth(subMonths(referenceDate, 1)), 20), 'yyyy-MM-dd');
+    const endDate = format(addDays(startOfMonth(referenceDate), 19), 'yyyy-MM-dd');
+    
+    const user = await storage.getUser(userId);
+    if (!user) throw new Error("Usuário não encontrado.");
+
+    const timeRecords = await storage.getTimeRecordsForUser(userId, startDate, endDate);
+    const approvedJustifications = (await storage.getJustificationsForUserByDateRange(userId, startDate, endDate))
+      .filter(j => j.status === 'approved');
+
+    return await generateMonthlyReportPDF({
+      user,
+      timeRecords,
+      month,
+      justificationsCount: approvedJustifications.length,
+      startDate,
+      endDate
+    });
+  };
+  
   app.get("/api/manager/report/monthly", requireManager, async (req, res, next) => {
     try {
       const { userId, month } = req.query;
-
       if (!userId || !month || typeof userId !== 'string' || typeof month !== 'string') {
         return res.status(400).json({ message: "Parâmetros 'userId' e 'month' são obrigatórios." });
       }
-
+      
+      const pdfBuffer = await handleReportGeneration(parseInt(userId), month);
       const user = await storage.getUser(parseInt(userId));
-      if (!user) {
-        return res.status(404).json({ message: "Usuário não encontrado." });
-      }
-
-      const timeRecords = await storage.getTimeRecordsForUser(parseInt(userId), month);
-      const hourBank = await storage.calculateHourBank(parseInt(userId), month);
-
-      const pdfBuffer = await generateMonthlyReportPDF({
-        user,
-        timeRecords,
-        hourBank,
-        month,
-      });
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=relatorio-${user.username}-${month}.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=relatorio-${user?.username}-${month}.pdf`);
       res.send(pdfBuffer);
-
     } catch (error) {
       next(error);
     }
@@ -530,31 +537,17 @@ app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
 
   app.get("/api/user/report/monthly", requireAuth, async (req, res, next) => {
     try {
-      const userId = req.user.id; // Pega o ID do próprio usuário logado
+      const userId = req.user.id;
       const { month } = req.query;
-
       if (!month || typeof month !== 'string') {
         return res.status(400).json({ message: "O parâmetro 'month' é obrigatório." });
       }
 
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "Usuário não encontrado." });
-      }
-
-      const timeRecords = await storage.getTimeRecordsForUser(userId, month);
-      const hourBank = await storage.calculateHourBank(userId, month);
-
-      const pdfBuffer = await generateMonthlyReportPDF({
-        user,
-        timeRecords,
-        month,
-      });
+      const pdfBuffer = await handleReportGeneration(userId, month);
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=relatorio-${user.username}-${month}.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=relatorio-${req.user.username}-${month}.pdf`);
       res.send(pdfBuffer);
-
     } catch (error) {
       next(error);
     }
