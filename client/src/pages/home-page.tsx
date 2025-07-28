@@ -22,26 +22,27 @@ export default function HomePage() {
   });
 
   const { data: todayRecord, refetch: refetchToday } = useQuery({
-    queryKey: ["/api/time-records/today"],
+    queryKey: ["/api/time-records/today", user?.id],
+    queryFn: () => apiRequest("GET", "/api/time-records/today").then(res => res.json()),
     enabled: user?.role === "employee", // Only fetch for employees
   });
 
   const { data: timeRecords = [] } = useQuery({
-    queryKey: ["/api/time-records", selectedMonth],
-    queryFn: () => 
-      fetch(`/api/time-records?month=${selectedMonth}`, { credentials: "include" })
-        .then(res => res.json()),
+    queryKey: ["/api/time-records", selectedMonth, user?.id],
+    queryFn: () => apiRequest("GET", `/api/time-records?month=${selectedMonth}`).then(res => res.json()),
     enabled: user?.role === "employee", // Only fetch for employees
   });
 
   const { data: justifications = [] } = useQuery({
-    queryKey: ["/api/justifications"],
+    queryKey: ["/api/justifications", user?.id],
+    queryFn: () => apiRequest("GET", `/api/justifications?userId=${user?.id}`).then(res => res.json()),
     enabled: user?.role === "employee", // Only fetch for employees
   });
 
   const timeRegistrationMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/time-records"),
     onSuccess: () => {
+      refetchToday();
       queryClient.invalidateQueries({ queryKey: ["/api/time-records"] });
       queryClient.invalidateQueries({ queryKey: ["/api/time-records/today"] });
       toast({
