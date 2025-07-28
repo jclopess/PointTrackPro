@@ -527,6 +527,39 @@ app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
       next(error);
     }
   });
+
+  app.get("/api/user/report/monthly", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.user.id; // Pega o ID do próprio usuário logado
+      const { month } = req.query;
+
+      if (!month || typeof month !== 'string') {
+        return res.status(400).json({ message: "O parâmetro 'month' é obrigatório." });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Usuário não encontrado." });
+      }
+
+      const timeRecords = await storage.getTimeRecordsForUser(userId, month);
+      const hourBank = await storage.calculateHourBank(userId, month);
+
+      const pdfBuffer = await generateMonthlyReportPDF({
+        user,
+        timeRecords,
+        month,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=relatorio-${user.username}-${month}.pdf`);
+      res.send(pdfBuffer);
+
+    } catch (error) {
+      next(error);
+    }
+  });
+  
   // Admin routes
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {

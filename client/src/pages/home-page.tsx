@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, LogOut, Plus, Calendar } from "lucide-react";
+import { Clock, Users, LogOut, Plus, Calendar, Download } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TimeRegistrationGrid } from "@/components/time-registration-grid";
@@ -38,7 +38,7 @@ export default function HomePage() {
     enabled: user?.role === "employee" && !user?.mustChangePassword, // Only fetch for employees
   });
 
-  const { data: timeRecords = [] } = useQuery({
+  const { data: timeRecords = [], refetch: refetchTimeRecords } = useQuery({
     queryKey: ["/api/time-records", selectedMonth, user?.id],
     queryFn: () => apiRequest("GET", `/api/time-records?month=${selectedMonth}`).then(res => res.json()),
     enabled: user?.role === "employee", // Only fetch for employees
@@ -49,6 +49,20 @@ export default function HomePage() {
     queryFn: () => apiRequest("GET", `/api/justifications?userId=${user?.id}`).then(res => res.json()),
     enabled: user?.role === "employee", // Only fetch for employees
   });
+
+  useEffect(() => {
+    if (user?.role === "employee" && !user?.mustChangePassword) {
+      refetchTimeRecords();
+    }
+  }, [selectedMonth, user, refetchTimeRecords]);
+  
+  useEffect(() => {
+    if (user?.mustChangePassword) {
+      setShowChangePasswordModal(true);
+    } else {
+      setShowChangePasswordModal(false);
+    }
+  }, [user]);
 
   const timeRegistrationMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/time-records"),
@@ -112,6 +126,12 @@ export default function HomePage() {
       options.push({ value, label });
     }
     return options;
+  };
+
+  const handleGenerateReport = () => {
+    // Constrói a URL para a API de relatório do usuário
+    const url = `/api/user/report/monthly?month=${selectedMonth}`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -215,40 +235,29 @@ export default function HomePage() {
                     <h3 className="text-lg font-semibold text-gray-900">Histórico de Registros</h3>
                   </div>
                   
-                  <div className="space-y-3 mb-4">
-                    {timeRecords.slice(0, 5).map((record: any) => (
-                      <div key={record.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {new Date(record.date).toLocaleDateString('pt-BR')}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {record.totalHours ? `${record.totalHours}h trabalhadas` : "Registro incompleto"}
-                          </div>
-                        </div>
-                        <Badge variant={record.totalHours ? "default" : "secondary"}>
-                          {record.totalHours ? "Completo" : "Pendente"}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="month-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                      Filtrar por mês:
-                    </label>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getMonthOptions().map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <label htmlFor="month-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                        Filtrar por mês:
+                      </label>
+                      <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getMonthOptions().map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* BOTÃO ADICIONADO */}
+                    <Button onClick={handleGenerateReport} className="w-full">
+                      <Download className="h-4 w-4 mr-2" />
+                      Gerar Relatório do Mês
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
