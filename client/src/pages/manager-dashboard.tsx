@@ -44,7 +44,7 @@ export default function ManagerDashboard() {
     mutationFn: ({ id, approved }: { id: number; approved: boolean }) =>
       apiRequest("POST", `/api/manager/justifications/${id}/approve`, { approved }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/justifications", user?.id] });
+      refetchJustifications();
       toast({
         title: "Justificativa processada",
         description: "A justificativa foi processada com sucesso.",
@@ -253,7 +253,9 @@ export default function ManagerDashboard() {
                             <span className="text-sm text-gray-500">
                               {new Date(justification.date).toLocaleDateString('pt-BR')}
                             </span>
-                            <Badge variant="secondary">Pendente</Badge>
+                            <Badge variant={justification.status === 'pending' ? 'secondary' : 'default'}>
+                              {justification.status === 'pending' ? 'Pendente' : justification.status}
+                            </Badge>
                           </div>
                           <p className="text-sm text-gray-600">{justification.reason}</p>
                           <p className="text-xs text-gray-500 mt-1">

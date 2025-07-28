@@ -126,9 +126,13 @@ export function registerRoutes(app: Express): Server {
 
   app.put("/api/admin/departments/:id", requireAdmin, async (req, res, next) => {
     try {
+      const validatedData = insertDepartmentSchema.partial().parse(req.body);
       const updatedDepartment = await storage.updateDepartment(Number(req.params.id), req.body);
       res.json(updatedDepartment);
     } catch (error) {
+      if (error instanceof z.ZodError){
+        return res.status(400).json({message: "Dados inválidos", errors: error.errors});
+      }
       next(error);
     }
   });
@@ -157,9 +161,13 @@ export function registerRoutes(app: Express): Server {
   
   app.put("/api/admin/functions/:id", requireAdmin, async (req, res, next) => {
     try {
+      const validatedData = insertFunctionSchema.partial().parse(req.body);
       const updatedFunction = await storage.updateFunction(Number(req.params.id), req.body);
       res.json(updatedFunction);
     } catch (error) {
+      if (error instanceof z.ZodError){
+        return res.status(400).json({message: "Dados inválidos", errors: error.errors});
+      }
       next(error);
     }
   });
@@ -187,9 +195,13 @@ export function registerRoutes(app: Express): Server {
 
   app.put("/api/admin/employment-types/:id", requireAdmin, async (req, res, next) => {
     try {
+      const validatedData = insertEmploymentTypeSchema.partial().parse(req.body);
       const updatedType = await storage.updateEmploymentType(Number(req.params.id), req.body);
       res.json(updatedType);
     } catch (error) {
+      if (error instanceof z.ZodError){
+        return res.status(400).json({message: "Dados inválidos", errors: error.errors});
+      }
       next(error);
     }
   });
@@ -484,34 +496,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: (error as Error).message });
     }
   });
-
-  app.get("/api/admin/password-reset-requests", requireAdmin, async (req, res) => {
-    try {
-      const requests = await storage.getPendingPasswordResetRequests();
-      res.json(requests);
-    } catch (error) {
-      res.status(500).json({ error: (error as Error).message });
-    }
-  });
-
-  app.post("/api/admin/users", requireAdmin, async (req, res) => {
-    try {
-      const userData = insertUserSchema.parse(req.body);
-      const user = await storage.createUser(userData);
-      res.status(201).json(user);
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
-    }
-  });
-
-
-
-
-
-
-
-
-
 
   const httpServer = createServer(app);
   return httpServer;

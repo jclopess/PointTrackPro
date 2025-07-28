@@ -63,7 +63,7 @@ export interface IStorage {
   sessionStore: any;
 }
 
-export class DatabaseStorage implements IStorage {
+export class DatabaseStorage {
   sessionStore: any;
 
   constructor() {
@@ -300,19 +300,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPendingJustifications(departmentId?: number): Promise<(Justification & { user: User })[]> {
-    let query = db
+    const conditions = [eq(justifications.status, "pending")];
+
+    if (departmentId) {
+      conditions.push(eq(users.departmentId, departmentId));
+    }
+    const results = await db
       .select()
       .from(justifications)
       .innerJoin(users, eq(justifications.userId, users.id))
-      .where(eq(justifications.status, "pending"))
+      .where(and(...conditions))
       .orderBy(desc(justifications.createdAt))
-      .$dynamic();
-      
-    if (departmentId) {
-      query = query.where(eq(users.departmentId, departmentId));
-    }
-
-    const results = await query;
 
     return results.map(result => ({
       ...result.justifications,
