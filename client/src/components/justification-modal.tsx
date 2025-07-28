@@ -60,6 +60,13 @@ export function JustificationModal({ open, onOpenChange }: JustificationModalPro
     { value: "late", label: "Atraso" },
     { value: "early-leave", label: "Saída antecipada" },
     { value: "error", label: "Erro no registro" },
+    { value: "vacation", label: "Férias" },
+    { value: "holiday", label: "Feriado" },
+    { value: "training", label: "Treinamento" },
+    { value: "work-from-home", label: "Trabalho remoto" },
+    { value: "health-problems", label: "Problemas de saúde" },
+    { value: "family-issue", label: "Questões familiares" },
+    { value: "other", label: "Outro" },
   ];
 
   return (

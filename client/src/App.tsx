@@ -14,9 +14,9 @@ import { AuthProvider } from "./hooks/use-auth";
 function Router() {
   return (
     <Switch>
-      <ProtectedRoute path="/" component={HomePage} />
-      <ProtectedRoute path="/manager" component={ManagerDashboard} requireManager />
-      <ProtectedRoute path="/admin" component={AdminDashboard} requireAdmin />
+      <Route path="/"><ProtectedRoute><HomePage /></ProtectedRoute></Route>
+      <Route path="/manager"><ProtectedRoute requireManager><ManagerDashboard /></ProtectedRoute></Route>
+      <Route path="/admin"><ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute></Route>
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
