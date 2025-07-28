@@ -1,6 +1,6 @@
 import { departments, users, timeRecords, justifications, hourBank, functions, employmentTypes, passwordResetRequests, type Department, type InsertDepartment, type User, type InsertUser, type TimeRecord, type InsertTimeRecord, type Justification, type InsertJustification, type HourBank, type InsertHourBank, type Function, type InsertFunction, type EmploymentType, type InsertEmploymentType, type PasswordResetRequest, type InsertPasswordResetRequest } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm"; 
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -265,7 +265,7 @@ export class DatabaseStorage {
       .select()
       .from(timeRecords)
       .where(and(...conditions))
-      .orderBy(desc(timeRecords.date));
+      .orderBy(asc(timeRecords.date));
   }
   async getAllTimeRecordsForDate(date: string, departmentId: number): Promise<(TimeRecord & { user: User })[]> {
     return await db

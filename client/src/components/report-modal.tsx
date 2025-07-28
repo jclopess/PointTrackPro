@@ -16,17 +16,28 @@ interface ReportModalProps {
 export function ReportModal({ open, onOpenChange, employees }: ReportModalProps) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
-    employeeId: "all",
+    employeeId: "", // Inicia sem seleção
     month: new Date().toISOString().slice(0, 7),
-    reportType: "summary",
+    reportType: "summary", // Mantido para futuras implementações
   });
 
+  // --- FUNÇÃO ATUALIZADA ---
   const handleGenerateReport = () => {
-    // In a real implementation, this would generate and download a PDF
-    toast({
-      title: "Relatório gerado",
-      description: "O relatório foi gerado com sucesso.",
-    });
+    if (!formData.employeeId) {
+      toast({
+        title: "Seleção necessária",
+        description: "Por favor, selecione um funcionário.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Constrói a URL para a API
+    const url = `/api/manager/report/monthly?userId=${formData.employeeId}&month=${formData.month}`;
+    
+    // Abre a URL em uma nova aba, o que iniciará o download
+    window.open(url, '_blank');
+
     onOpenChange(false);
   };
 
@@ -57,10 +68,11 @@ export function ReportModal({ open, onOpenChange, employees }: ReportModalProps)
                 onValueChange={(value) => setFormData({ ...formData, employeeId: value })}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  {/* Atualizado para um placeholder */}
+                  <SelectValue placeholder="Selecione um funcionário" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os funcionários</SelectItem>
+                  {/* Removida a opção "Todos os funcionários" por enquanto */}
                   {employees.map((employee) => (
                     <SelectItem key={employee.id} value={employee.id.toString()}>
                       {employee.name}
@@ -88,6 +100,7 @@ export function ReportModal({ open, onOpenChange, employees }: ReportModalProps)
               </Select>
             </div>
           </div>
+          {/* O tipo de relatório é mantido para o futuro */}
           <div>
             <Label>Tipo de Relatório</Label>
             <RadioGroup
@@ -98,13 +111,7 @@ export function ReportModal({ open, onOpenChange, employees }: ReportModalProps)
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="summary" id="summary" />
                 <Label htmlFor="summary" className="text-sm">
-                  Resumo mensal
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="detailed" id="detailed" />
-                <Label htmlFor="detailed" className="text-sm">
-                  Detalhado com banco de horas
+                  Resumo mensal com banco de horas
                 </Label>
               </div>
             </RadioGroup>

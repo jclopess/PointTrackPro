@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth, hashPassword } from "./auth"; // Importa a função hashPassword
 import { storage } from "./storage";
+import { generateMonthlyReportPDF } from "./pdf-generator";
 import { insertTimeRecordSchema, insertJustificationSchema, insertDepartmentSchema, insertUserSchema, insertFunctionSchema, insertEmploymentTypeSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -263,6 +264,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Routes for Marcações
   app.get("/api/time-records/today", requireAuth, async (req, res, next) => {
     try {
       const userId = req.user.id;
@@ -330,7 +332,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Submit justification
+  // Routes for Justifications
   app.post("/api/justifications", requireAuth, async (req, res, next) => {
     try {
       const validatedData = insertJustificationSchema.parse({
@@ -360,6 +362,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Manager endpoints
+  // Lista todos os funcionários vinculados ao departamento do gestor
   app.get("/api/manager/employees", requireManager, async (req, res, next) => {
     try {
       const managerDepartmentId = req.user.departmentId;
@@ -373,6 +376,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Lista todos os registros do dia dos funcionarios do departamento do Gestor.
   app.get("/api/manager/time-records/:date", requireManager, async (req, res, next) => {
     try {
       const date = req.params.date;
@@ -386,6 +390,8 @@ export function registerRoutes(app: Express): Server {
       next(error);
     }
   });
+
+  // Lista todas as justificativas pendentes para o Gestor
   app.get("/api/manager/justifications/pending", requireManager, async (req, res, next) => {
     try {
       // 1. Obter o ID do departamento do gestor logado.
@@ -408,7 +414,6 @@ export function registerRoutes(app: Express): Server {
     }
 
   });
-
 
   app.post("/api/manager/justifications/:id/approve", requireManager, async (req, res, next) => {
     try {
@@ -469,6 +474,38 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Gera relatório mensal
+  app.get("/api/manager/report/monthly", requireManager, async (req, res, next) => {
+    try {
+      const { userId, month } = req.query;
+
+      if (!userId || !month || typeof userId !== 'string' || typeof month !== 'string') {
+        return res.status(400).json({ message: "Parâmetros 'userId' e 'month' são obrigatórios." });
+      }
+
+      const user = await storage.getUser(parseInt(userId));
+      if (!user) {
+        return res.status(404).json({ message: "Usuário não encontrado." });
+      }
+
+      const timeRecords = await storage.getTimeRecordsForUser(parseInt(userId), month);
+      const hourBank = await storage.calculateHourBank(parseInt(userId), month);
+
+      const pdfBuffer = await generateMonthlyReportPDF({
+        user,
+        timeRecords,
+        hourBank,
+        month,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=relatorio-${user.username}-${month}.pdf`);
+      res.send(pdfBuffer);
+
+    } catch (error) {
+      next(error);
+    }
+  });
   // Admin routes
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
