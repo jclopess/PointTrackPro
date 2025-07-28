@@ -79,7 +79,8 @@ export const justifications = pgTable("justifications", {
   userId: integer("user_id").notNull().references(() => users.id),
   date: text("date").notNull(),
   type: text("type").notNull(), // "absence", "late", "early-leave", "error"
-  reason: text("reason").notNull(),
+  reason: text("reason").notNull(), //e.g., "entry1", "exit1", "entry2", "exit2", "all"
+  recordToAdjust: text("record_to_adjust"),
   status: text("status").notNull().default("pending"), // "pending", "approved", "rejected"
   approvedBy: integer("approved_by").references(() => users.id),
   approvedAt: timestamp("approved_at"),

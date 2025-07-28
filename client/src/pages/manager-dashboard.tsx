@@ -16,6 +16,21 @@ import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { type TimeRecord } from "@shared/schema";
 
+const justificationTypeLabels: { [key: string]: string } = {
+  absence: "Falta",
+  late: "Atraso",
+  "early-leave": "Saída antecipada",
+  error: "Erro no registro",
+  vacation: "Férias",
+  holiday: "Feriado",
+  training: "Treinamento",
+  "work-from-home": "Trabalho remoto",
+  "health-problems": "Problemas de saúde",
+  "family-issue": "Questões familiares",
+  "external-meetings": "Reuniões externas",
+  other: "Outros motivos",
+};
+
 export default function ManagerDashboard() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
@@ -274,7 +289,7 @@ export default function ManagerDashboard() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                            <h4 className="text-sm font-medium text-gray-900">{justification.user.name}</h4>
+                            <h4 className="text-sm font-medium text-black-900">{justification.user.name}</h4>
                             <span className="text-sm text-gray-500">
                               {new Date(justification.date).toLocaleDateString('pt-BR')}
                             </span>
@@ -282,10 +297,8 @@ export default function ManagerDashboard() {
                               {justification.status === 'pending' ? 'Pendente' : justification.status}
                             </Badge>
                           </div>
-                          <p className="text-sm text-gray-600">{justification.reason}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Tipo: {justification.type} • Enviado em {new Date(justification.createdAt).toLocaleDateString('pt-BR')}
-                          </p>
+                          <p className="text-sm text-gray-600 mb-1">Tipo: {justificationTypeLabels[justification.type] || justification.type}</p>
+                          <p className="text-sm text-gray-600 mb-1">Motivo: {justification.reason} • Enviado em {new Date(justification.createdAt).toLocaleDateString('pt-BR')}</p>
                         </div>
                         <div className="flex space-x-2 ml-4">
                           <Button
