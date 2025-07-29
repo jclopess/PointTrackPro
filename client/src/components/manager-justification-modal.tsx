@@ -62,7 +62,7 @@ export function ManagerJustificationModal({ open, onOpenChange, employees, onSuc
     { value: "health-problems", label: "Atestado Médico / Problemas de saúde" },
     { value: "family-issue", label: "Licença (Luto, Maternidade, etc.)" },
     { value: "training", label: "Treinamento Externo" },
-    { value: "other", label: "Outros (Abono)" },
+    { value: "holiday", label: "Feriado" },
   ];
 
   return (
