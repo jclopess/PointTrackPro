@@ -114,8 +114,14 @@ export function generateMonthlyReportPDF(data: ReportData): Promise<Buffer> {
             doc.text(dailyHoursString, 50 + itemWidth * 5, rowY, { ...textOptions, width: itemWidth, align: 'right' });
         } else if (justification) {
             const label = justificationTypeLabels[justification.type] || justification.type;
-            const textToDisplay = justification.abona_horas ? `${label} (Abonado)` : label;
-            doc.fillColor('blue').text(textToDisplay, 50 + itemWidth, rowY, { width: itemWidth * 4, align: 'center' }).fillColor('black');
+            
+            // --- LÓGICA CORRIGIDA AQUI ---
+            if (justification.type === 'holiday') {
+                doc.fillColor('red').text(label, 50 + itemWidth, rowY, { width: itemWidth * 4, align: 'center' }).fillColor('black');
+            } else {
+                const textToDisplay = justification.abona_horas ? `${label} (Abonado)` : label;
+                doc.fillColor('blue').text(textToDisplay, 50 + itemWidth, rowY, { width: itemWidth * 4, align: 'center' }).fillColor('black');
+            }
         } else if (dayOfWeek === 0 || dayOfWeek === 6) {
             doc.fillColor('red').text("Folga", 50 + itemWidth, rowY, { width: itemWidth * 4, align: 'center' }).fillColor('black');
         } else {
@@ -123,7 +129,6 @@ export function generateMonthlyReportPDF(data: ReportData): Promise<Buffer> {
         }
         doc.moveDown();
     });
-
 
     const resumo = doc.page.height - 130;
     doc.fontSize(12).font('Helvetica-Bold').text('Resumo Mensal', 50, resumo);

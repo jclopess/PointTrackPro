@@ -4,7 +4,7 @@ import { eq, and, desc, asc, gte, lte, sql, between } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-import { eachDayOfInterval, getDay } from 'date-fns';
+import { eachDayOfInterval, getDay, format} from 'date-fns';
 
 const PostgresSessionStore = connectPg(session);
 
@@ -392,9 +392,11 @@ export class DatabaseStorage {
     if (!user) throw new Error("User not found");
 
     const records = await this.getTimeRecordsForUser(userId, startDate, endDate);
-    
+    const approvedJustifications = (await this.getJustificationsForUserByDateRange(userId, startDate, endDate))
+        .filter(j => j.status === 'approved');
     const abonadas = (await this.getJustificationsForUserByDateRange(userId, startDate, endDate))
         .filter(j => j.status === 'approved' && j.abona_horas);
+    const holidays = approvedJustifications.filter(j => j.type === 'holiday');
 
     let workedHours = 0;
     records.forEach(record => {
@@ -413,7 +415,7 @@ export class DatabaseStorage {
 
     workedHours += abonoHours;
 
-    const workingDays = this.getWorkingDaysInPeriod(startDate, endDate);
+    const workingDays = this.getWorkingDaysInPeriod(startDate, endDate, holidays); 
     const expectedHours = workingDays * parseFloat(user.dailyWorkHours);
     const balance = workedHours - expectedHours;
 
@@ -424,17 +426,19 @@ export class DatabaseStorage {
     };
   }
 
-  private getWorkingDaysInPeriod(startDate: string, endDate: string): number {
+  private getWorkingDaysInPeriod(startDate: string, endDate: string, holidays: Justification[]): number {
     const interval = {
       start: new Date(`${startDate}T12:00:00Z`),
       end: new Date(`${endDate}T12:00:00Z`)
     };
     const allDays = eachDayOfInterval(interval);
+    const holidayDates = holidays.map(h => h.date);
     let workingDays = 0;
 
     allDays.forEach(day => {
       const dayOfWeek = getDay(day);
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Segunda a Sexta
+      const dateString = format(day, 'yyyy-MM-dd');
+      if (dayOfWeek >= 1 && dayOfWeek <= 5 && !holidayDates.includes(dateString)) {
         workingDays++;
       }
     });
