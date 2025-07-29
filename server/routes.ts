@@ -77,6 +77,33 @@ export function registerRoutes(app: Express): Server {
         }
   });
 
+  // Admin routes
+  app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  app.get("/api/admin/functions", requireAdmin, async (req, res) => {
+    try {
+      const functions = await storage.getAllFunctions();
+      res.json(functions);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  app.get("/api/admin/employment-types", requireAdmin, async (req, res) => {
+    try {
+      const types = await storage.getAllEmploymentTypes();
+      res.json(types);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
   // Routes for users update
   app.put("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
     try {
@@ -290,6 +317,19 @@ app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
       next(error);
     }
   });
+
+  app.get("/api/time-records", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const month = req.query.month as string;
+      // Chama o método passando o 'month'
+      const records = await storage.getTimeRecordsForUser(userId, { month });
+      res.json(records);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/time-records", requireAuth, async (req, res, next) => {
     try {
       const userId = req.user.id;
@@ -406,6 +446,35 @@ app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
     }
   });
 
+  app.post("/api/manager/justifications", requireManager, async (req, res, next) => {
+    try {
+      const manager = req.user;
+      const { userId, date, type, reason } = req.body;
+
+      const employee = await storage.getUser(userId);
+      if (!employee || (manager.role !== 'admin' && employee.departmentId !== manager.departmentId)) {
+        return res.status(403).json({ message: "Acesso negado." });
+      }
+
+      const abona_horas = ["vacation", "health-problems", "family-issue", "training"].includes(type);
+
+      const newJustification = await storage.createJustification({
+        userId,
+        date,
+        type,
+        reason,
+        abona_horas,
+        status: "approved",
+        approvedBy: manager.id,
+        approvedAt: new Date(),
+      });
+      
+      res.status(201).json(newJustification);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Lista todas as justificativas pendentes para o Gestor
   app.get("/api/manager/justifications/pending", requireManager, async (req, res, next) => {
     try {
@@ -496,7 +565,7 @@ app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
 
   // Gera relatório mensal
   const handleReportGeneration = async (userId: number, month: string) => {
-    const referenceDate = new Date(`${month}-02T12:00:00Z`); // Usamos o dia 2 para evitar problemas com fuso horário
+    const referenceDate = new Date(`${month}-02T12:00:00Z`);
     const startDate = format(addDays(startOfMonth(subMonths(referenceDate, 1)), 20), 'yyyy-MM-dd');
     const endDate = format(addDays(startOfMonth(referenceDate), 19), 'yyyy-MM-dd');
     
@@ -506,14 +575,17 @@ app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
     const timeRecords = await storage.getTimeRecordsForUser(userId, startDate, endDate);
     const approvedJustifications = (await storage.getJustificationsForUserByDateRange(userId, startDate, endDate))
       .filter(j => j.status === 'approved');
+    
+    const hourBank = await storage.calculateHourBank(userId, startDate, endDate);
 
     return await generateMonthlyReportPDF({
       user,
       timeRecords,
       month,
-      justificationsCount: approvedJustifications.length,
+      approvedJustifications, // Passa a lista completa de justificativas
       startDate,
-      endDate
+      endDate,
+      hourBank
     });
   };
   
@@ -553,33 +625,6 @@ app.post("/api/user/change-password", requireAuth, async (req, res, next) => {
     }
   });
   
-  // Admin routes
-  app.get("/api/admin/users", requireAdmin, async (req, res) => {
-    try {
-      const users = await storage.getAllUsers();
-      res.json(users);
-    } catch (error) {
-      res.status(500).json({ error: (error as Error).message });
-    }
-  });
-
-  app.get("/api/admin/functions", requireAdmin, async (req, res) => {
-    try {
-      const functions = await storage.getAllFunctions();
-      res.json(functions);
-    } catch (error) {
-      res.status(500).json({ error: (error as Error).message });
-    }
-  });
-
-  app.get("/api/admin/employment-types", requireAdmin, async (req, res) => {
-    try {
-      const types = await storage.getAllEmploymentTypes();
-      res.json(types);
-    } catch (error) {
-      res.status(500).json({ error: (error as Error).message });
-    }
-  });
 
   const httpServer = createServer(app);
   return httpServer;

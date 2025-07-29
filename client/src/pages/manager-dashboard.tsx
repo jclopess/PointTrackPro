@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, Users, LogOut, FileText, TriangleAlert, CheckCircle, XCircle, ArrowLeft } from "lucide-react";
+import { Clock, Users, LogOut, FileText, TriangleAlert, CheckCircle, XCircle, ArrowLeft, PlusCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmployeeTable } from "@/components/employee-table";
 import { ReportModal } from "@/components/report-modal";
 import { TimeRecordModal } from "@/components/time-record-modal";
 import { ChangePasswordModal } from "@/components/change-password-modal";
+import { ManagerJustificationModal } from "@/components/manager-justification-modal";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { type TimeRecord } from "@shared/schema";
@@ -41,6 +42,7 @@ export default function ManagerDashboard() {
   const [editingRecord, setEditingRecord] = useState<TimeRecord | null>(null);
   const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showManagerJustificationModal, setShowManagerJustificationModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const today = new Date().toISOString().split('T')[0];
 
@@ -60,7 +62,7 @@ export default function ManagerDashboard() {
     enabled: !!user,
   });
 
-  const { data: employees = [] } = useQuery({
+  const { data: employees = [], refetch: refetchEmployees } = useQuery({
     queryKey: ["/api/manager/employees", user?.id],
     queryFn: ({ queryKey }) => apiRequest("GET", queryKey[0] as string).then(res => res.json()),
     enabled: !!user && !user?.mustChangePassword,
@@ -172,13 +174,10 @@ export default function ManagerDashboard() {
                   <p className="text-gray-600">Gerencie registros e relatórios da equipe</p>
                 </div>
                 <div className="mt-4 lg:mt-0 flex space-x-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowReportModal(true)}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Gerar Relatório
-                  </Button>
+                  <Button onClick={() => setShowManagerJustificationModal(true)}>
+                    <PlusCircle className="h-4 w-4 mr-2" />Lançar Afastamento</Button>
+                  <Button variant="outline"onClick={() =>setShowReportModal(true)}>
+                    <FileText className="h-4 w-4 mr-2" />Gerar Relatório</Button>
                 </div>
               </div>
             </CardContent>
@@ -340,7 +339,16 @@ export default function ManagerDashboard() {
         onOpenChange={setShowReportModal}
         employees={employees}
       />
-        <TimeRecordModal // Modal for creating or editing time records
+      <ManagerJustificationModal
+        open={showManagerJustificationModal}
+        onOpenChange={setShowManagerJustificationModal}
+        employees={employees}
+        onSuccess={() => {
+          // Adicione aqui os refetches necessários se precisar atualizar outras listas
+          refetchJustifications();
+        }}
+      />
+      <TimeRecordModal // Modal for creating or editing time records
         record={editingRecord}
         open={showTimeRecordModal}
         onOpenChange={setShowTimeRecordModal}

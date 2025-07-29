@@ -4,7 +4,7 @@ import { eq, and, desc, asc, gte, lte, sql, between } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-import { start } from "repl";
+import { eachDayOfInterval, getDay } from 'date-fns';
 
 const PostgresSessionStore = connectPg(session);
 
@@ -264,16 +264,25 @@ export class DatabaseStorage {
     return timeRecord || undefined;
   }
 
-  async getTimeRecordsForUser(userId: number, startDate: string, endDate: string): Promise<TimeRecord[]> {
+  async getTimeRecordsForUser(userId: number, options: { month?: string, startDate?: string, endDate?: string }): Promise<TimeRecord[]> {
+    let conditions = [eq(timeRecords.userId, userId)];
+
+    if (options.month) {
+      conditions.push(sql`substr(${timeRecords.date}, 1, 7) = ${options.month}`);
+    } else if (options.startDate && options.endDate) {
+      conditions.push(between(timeRecords.date, options.startDate, options.endDate));
+    } else {
+        // Se nada for fornecido, retorna um array vazio por segurança
+        return [];
+    }
+    
     return await db
       .select()
       .from(timeRecords)
-      .where(and(
-        eq(timeRecords.userId, userId),
-        between(timeRecords.date, startDate, endDate)
-      ))
+      .where(and(...conditions))
       .orderBy(asc(timeRecords.date));
   }
+
   async getAllTimeRecordsForDate(date: string, departmentId: number): Promise<(TimeRecord & { user: User })[]> {
     return await db
       .select()
@@ -378,51 +387,57 @@ export class DatabaseStorage {
     }
   }
 
-  async calculateHourBank(userId: number, month: string): Promise<HourBank> {
-    // Get user's daily work hours
+  async calculateHourBank(userId: number, startDate: string, endDate: string): Promise<Partial<HourBank>> {
     const user = await this.getUser(userId);
     if (!user) throw new Error("User not found");
 
-    // Get all time records for the month
-    const records = await this.getTimeRecordsForUser(userId, `${month}-01`, `${month}-31`);
+    const records = await this.getTimeRecordsForUser(userId, startDate, endDate);
     
-    // Calculate total worked hours
+    const abonadas = (await this.getJustificationsForUserByDateRange(userId, startDate, endDate))
+        .filter(j => j.status === 'approved' && j.abona_horas);
+
     let workedHours = 0;
-    for (const record of records) {
+    records.forEach(record => {
       if (record.totalHours) {
         workedHours += parseFloat(record.totalHours);
       }
-    }
+    });
 
-    // Calculate expected hours (working days * daily hours)
-    const workingDays = this.getWorkingDaysInMonth(month);
+    let abonoHours = 0;
+    abonadas.forEach(justification => {
+        const recordExists = records.some(r => r.date === justification.date);
+        if (!recordExists) {
+            abonoHours += parseFloat(user.dailyWorkHours);
+        }
+    });
+
+    workedHours += abonoHours;
+
+    const workingDays = this.getWorkingDaysInPeriod(startDate, endDate);
     const expectedHours = workingDays * parseFloat(user.dailyWorkHours);
     const balance = workedHours - expectedHours;
 
-    const hourBankData: InsertHourBank = {
-      userId,
-      month,
+    return {
       expectedHours: expectedHours.toString(),
       workedHours: workedHours.toString(),
       balance: balance.toString(),
     };
-
-    return await this.createOrUpdateHourBank(hourBankData);
   }
 
-  private getWorkingDaysInMonth(month: string): number {
-    const [year, monthNum] = month.split('-').map(Number);
-    const daysInMonth = new Date(year, monthNum, 0).getDate();
+  private getWorkingDaysInPeriod(startDate: string, endDate: string): number {
+    const interval = {
+      start: new Date(`${startDate}T12:00:00Z`),
+      end: new Date(`${endDate}T12:00:00Z`)
+    };
+    const allDays = eachDayOfInterval(interval);
     let workingDays = 0;
 
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, monthNum - 1, day);
-      const dayOfWeek = date.getDay();
-      // Count Monday-Friday as working days (1-5)
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+    allDays.forEach(day => {
+      const dayOfWeek = getDay(day);
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Segunda a Sexta
         workingDays++;
       }
-    }
+    });
 
     return workingDays;
   }

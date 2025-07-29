@@ -1,17 +1,32 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
-import { User, TimeRecord } from '@shared/schema';
+import { User, TimeRecord, Justification, HourBank } from '@shared/schema';
 import { getDaysInMonth, eachDayOfInterval, format, getDay } from 'date-fns';
 
 interface ReportData {
   user: User;
   timeRecords: TimeRecord[];
   month: string;
-  justificationsCount: number;
+  approvedJustifications: Justification[];
   startDate: string;
   endDate: string;
 }
+
+const justificationTypeLabels: { [key: string]: string } = {
+  absence: "Falta",
+  late: "Atraso",
+  "early-leave": "Saída antecipada",
+  error: "Erro no registro",
+  vacation: "Férias",
+  holiday: "Feriado",
+  training: "Treinamento",
+  "work-from-home": "Trabalho remoto",
+  "health-problems": "Atestado Médico",
+  "family-issue": "Licença Familiar",
+  "external-meetings": "Reunião Externa",
+  other: "Outros",
+};
 
 function calculateDailyHours(record: TimeRecord): number {
     let totalMinutes = 0;
@@ -78,6 +93,8 @@ export function generateMonthlyReportPDF(data: ReportData): Promise<Buffer> {
       const dayOfWeek = getDay(day);
       
       const record = data.timeRecords.find(r => r.date === dateString);
+      const justification = data.approvedJustifications.find(j => j.date === dateString)
+      
       const rowY = doc.y;
       const formattedDate = format(day, 'dd/MM/yyyy');
 
@@ -95,12 +112,14 @@ export function generateMonthlyReportPDF(data: ReportData): Promise<Buffer> {
             doc.text(record.entry2 || '--:--', 50 + itemWidth * 3, rowY, textOptions);
             doc.text(record.exit2 || '--:--', 50 + itemWidth * 4, rowY, textOptions);
             doc.text(dailyHoursString, 50 + itemWidth * 5, rowY, { ...textOptions, width: itemWidth, align: 'right' });
-
-        } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Domingo ou Sábado
-            doc.fillColor('gray').text("Folga", 50 + itemWidth, rowY, { width: itemWidth * 5, align: 'center' }).fillColor('black');
+        } else if (justification) {
+            const label = justificationTypeLabels[justification.type] || justification.type;
+            const textToDisplay = justification.abona_horas ? `${label} (Abonado)` : label;
+            doc.fillColor('blue').text(textToDisplay, 50 + itemWidth, rowY, { width: itemWidth * 4, align: 'center' }).fillColor('black');
+        } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+            doc.fillColor('red').text("Folga", 50 + itemWidth, rowY, { width: itemWidth * 4, align: 'center' }).fillColor('black');
         } else {
-            // Dia de semana sem registro
-            doc.fillColor('gray').text("Sem registro", 50 + itemWidth, rowY, { width: itemWidth * 5, align: 'center' }).fillColor('black');
+            doc.fillColor('gray').text("Sem registro", 50 + itemWidth, rowY, { width: itemWidth * 4, align: 'center' }).fillColor('black');
         }
         doc.moveDown();
     });
@@ -109,7 +128,7 @@ export function generateMonthlyReportPDF(data: ReportData): Promise<Buffer> {
     const resumo = doc.page.height - 130;
     doc.fontSize(12).font('Helvetica-Bold').text('Resumo Mensal', 50, resumo);
     doc.fontSize(12).font('Helvetica-Bold').text(`Horas trabalhadas no mês: ${totalMonthHours.toFixed(2)}h`, 50, resumo + 15, { align: 'left' });
-    doc.font('Helvetica-Bold').text(`Total de justificativas aprovadas: ${data.justificationsCount}`, 50, resumo +15, { align: 'right' });
+    doc.font('Helvetica-Bold').text(`Total de justificativas aprovadas: ${data.approvedJustifications.length}`, 50, resumo +15, { align: 'right' });
 
     //const signatureY = doc.y > 680 ? doc.addPage().y + 50 : doc.y + 70;
     const signatureY = doc.page.height - 80;
