@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Serviço da Aplicação (Backend + Frontend)
+  app:
+    build: . # Constrói a imagem usando o Dockerfile na pasta atual
+    container_name: pointtrack_app
+    ports:
+      - "5000:5000" # Mapeia a porta 5000 do contêiner para a porta 5000 da sua máquina
+    environment:
+      # A URL do banco de dados agora aponta para o serviço 'db' do Docker Compose
+      - DATABASE_URL=postgresql://postgres:mysecretpassword@db:5432/pointtrack_db
+      - SESSION_SECRET=pointtrack_session_secret_production # Use um segredo mais forte para produção real
+    depends_on:
+      - db # Garante que o serviço do banco de dados inicie antes da aplicação
+    networks:
+      - pointtrack-net
+
+  # Serviço do Banco de Dados
+  db:
+    image: postgres:15-alpine # Usa a imagem oficial do PostgreSQL
+    container_name: pointtrack_db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_DB=pointtrack_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persiste os dados do banco de dados
+    ports:
+      - "5432:5432" # Expõe a porta do Postgres para a máquina host (opcional, bom para debug)
+    networks:
+      - pointtrack-net
+
+# Define os volumes para persistência de dados
+volumes:
+  postgres_data:
+
+# Define a rede para comunicação entre os contêineres
+networks:
+  pointtrack-net:
+    driver: bridge
