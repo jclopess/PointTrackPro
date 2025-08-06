@@ -1,11 +1,9 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
-import { createServer as createViteServer, createLogger } from "vite";
+import { createServer as createViteServer } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
-
-const viteLogger = createLogger();
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
@@ -50,7 +48,6 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   // Rota "catch-all" que serve o index.html para qualquer outra requisição.
-  // Isso é essencial para que o roteamento do lado do cliente (React com Wouter) funcione.
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
