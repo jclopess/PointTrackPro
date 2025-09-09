@@ -1,4 +1,4 @@
-import { departments, users, timeRecords, justifications, hourBank, functions, employmentTypes, passwordResetRequests, type Department, type InsertDepartment, type User, type InsertUser, type TimeRecord, type InsertTimeRecord, type Justification, type InsertJustification, type HourBank, type InsertHourBank, type Function, type InsertFunction, type EmploymentType, type InsertEmploymentType, type PasswordResetRequest, type InsertPasswordResetRequest } from "@shared/schema";
+import { departments, users, timeRecords, justifications, hourBank, functions, employmentTypes, passwordResetRequests, type Department, type InsertDepartment, type User, type InsertUser, type TimeRecord, type InsertTimeRecord, type Justification, type InsertJustification, type HourBank, type InsertHourBank, type Function, type InsertFunction, type EmploymentType, type InsertEmploymentType, type PasswordResetRequest, type InsertPasswordResetRequest } from "../shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, gte, lte, sql, between } from "drizzle-orm"; 
 import session from "express-session";

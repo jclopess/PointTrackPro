@@ -13,19 +13,22 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 # Instala as dependências de produção e as dev dependencies para o drizzle-kit
 RUN npm install --legacy-peer-deps
+
 # Copia o backend compilado
 COPY --from=build /app/dist ./dist
-# Copia o frontend compilado
+# Copia todos os arquivos estáticos do front-end, incluindo o CSS, a partir da pasta de build do Vite
 COPY --from=build /app/dist/public ./dist/public
-COPY drizzle.config.ts .
+# Copia o frontend compilado
+COPY tsconfig.json .
 COPY shared shared
-COPY server/create-admin.ts server/create-admin.ts
+COPY server server
+COPY drizzle.config.ts .
 
 # Roda a migração antes de iniciar a aplicação, fornecendo a DATABASE_URL
-RUN DATABASE_URL=postgresql://postgres:mysecretpassword@db:5432/pointtrack_db npm run db:push
+RUN DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/pointtrack_db npm run db:push:docker
 
 # Cria o usuário admin após a migração
-RUN DATABASE_URL=postgresql://postgres:mysecretpassword@db:5432/pointtrack_db npm run create:admin
+RUN DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/pointtrack_db npm run create:admin:docker
 
 EXPOSE 5000
 CMD ["npm", "start"]

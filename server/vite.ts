@@ -36,7 +36,7 @@ export async function setupVite(app: Express, server: Server) {
 
 // Esta função será usada apenas em PRODUÇÃO
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "../dist/public");
+  const distPath = path.resolve(process.cwd(), "dist/public");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(

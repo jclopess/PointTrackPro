@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
-import { User, TimeRecord, Justification, HourBank } from '@shared/schema';
+import { User, TimeRecord, Justification, HourBank } from '../shared/schema';
 import { getDaysInMonth, eachDayOfInterval, format, getDay } from 'date-fns';
 
 interface ReportData {
